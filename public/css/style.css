@@ -1,9 +1,14 @@
 /* WA Mini League — page-specific rules layered on top of theme.css, same
    split the rest of dreamwa.re uses (shared chrome in theme.css, page
    styling alongside its own markup). Reuses the site's existing component
-   conventions rather than inventing new ones: tool-header/tag-strip from
-   the WA Tools page, tab-bar buttons for top-level nav, dropzone/card/button
+   conventions rather than inventing new ones: header.tool-header from the
+   WA Tools page, tab-bar buttons for top-level nav, dropzone/card/button
    styling from the Create tab.
+
+   No .tag-strip/.tag chips here (removed) — they read as clickable
+   buttons next to the tab-bar's actual buttons, which was confusing more
+   than it was informative. Keep chrome/labels visually distinct from
+   interactive elements: boxed + bordered = clickable, plain text = not.
 
    Player/team names are rendered in JetBrains Mono, not the DOS bitmap
    font — replay names are raw single-byte Latin-1, and Perfect DOS VGA 437
@@ -30,12 +35,6 @@ header.tool-header p {
   color: var(--fg-dim); margin: 0 0 16px; font-size: 14px;
   max-width: 640px; line-height: 1.5;
 }
-.tag-strip { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-.tag {
-  font-size: 13px; letter-spacing: 0.5px; padding: 4px 10px;
-  border: 1px solid var(--border-mid); color: var(--fg-dim); background: var(--bg-raised);
-}
-
 /* ---- top-level page nav, styled like the Extract/Create tab bar ---- */
 .tab-bar { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
 .tab-bar a {
