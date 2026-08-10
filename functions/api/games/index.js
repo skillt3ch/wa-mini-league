@@ -7,6 +7,9 @@ export async function onRequestGet(context) {
     SELECT g.id, g.played_at, g.duration_s, g.turns, g.is_draw,
            g.replay_filename, g.replay_hash, g.submitted_at,
            g.winner_player_id AS winner_player_id,
+           g.outcome_status AS outcome_status,
+           g.winner_source AS winner_source,
+           g.wadb_slug AS wadb_slug,
            winner.name AS winner_name
     FROM games g
     LEFT JOIN players winner ON winner.id = g.winner_player_id
@@ -41,6 +44,9 @@ export async function onRequestGet(context) {
     isDraw: !!g.is_draw,
     winnerPlayerId: g.winner_player_id,
     winnerName: g.winner_name,
+    outcomeStatus: g.outcome_status,
+    winnerSource: g.winner_source,
+    wadbUrl: g.wadb_slug ? `https://wormsarmageddon.com/games/${g.wadb_slug}` : null,
     replayFilename: g.replay_filename,
     replayDownloadUrl: `/api/replay/${g.replay_hash}`,
     submittedAt: g.submitted_at,

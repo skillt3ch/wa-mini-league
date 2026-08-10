@@ -28,9 +28,12 @@ export async function onRequestPatch(context) {
     }
   }
 
+  // A manual edit always resolves the game — even correcting a WADB-verified
+  // result counts as an admin override from here on.
+  const outcomeStatus = isDraw ? 'draw' : 'confirmed';
   await env.DB.prepare(
-    `UPDATE games SET winner_player_id = ?, is_draw = ? WHERE id = ?`
-  ).bind(winnerPlayerId, isDraw ? 1 : 0, id).run();
+    `UPDATE games SET winner_player_id = ?, is_draw = ?, outcome_status = ?, winner_source = 'manual' WHERE id = ?`
+  ).bind(winnerPlayerId, isDraw ? 1 : 0, outcomeStatus, id).run();
 
   return Response.json({ ok: true });
 }

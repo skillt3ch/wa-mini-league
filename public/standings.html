@@ -101,8 +101,10 @@ const expanded = new Set();
 
 function computeStreaks(list) {
   const map = new Map();
-  // `list` is already sorted most-recent-first by the API.
+  // `list` is already sorted most-recent-first by the API. Unresolved games
+  // (no confirmed winner/draw yet) are skipped, same as standings.
   for (const g of list) {
+    if (g.outcomeStatus === 'unresolved') continue;
     for (const p of g.players) {
       const arr = map.get(p.playerId) || [];
       if (arr.length < 5) {
@@ -215,24 +217,33 @@ function renderGames() {
 
   gamesWrap.innerHTML = filtered.map(g => {
     const isExpanded = expanded.has(g.id);
+    const unresolved = g.outcomeStatus === 'unresolved';
+    const resultTag = unresolved
+      ? `<span class="unresolved-tag gr-meta">Needs review</span>`
+      : `<span class="${g.isDraw ? 'draw-tag' : 'winner-tag'} name-raw gr-meta">${g.isDraw ? 'Draw' : esc(g.winnerName)}</span>`;
     const row = `
       <button class="game-row fade-in" data-id="${g.id}" aria-expanded="${isExpanded}">
         <span class="gr-players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
         <span class="gr-right">
-          <span class="${g.isDraw ? 'draw-tag' : 'winner-tag'} name-raw gr-meta">${g.isDraw ? 'Draw' : esc(g.winnerName)}</span>
+          ${resultTag}
           <span class="gr-meta">${fmtDate(g.playedAt)}</span>
           <span class="gr-caret">&#9656;</span>
         </span>
       </button>`;
+    const provenance = g.wadbUrl
+      ? `<a class="dl-link" href="${g.wadbUrl}" target="_blank" rel="noopener">verified via WADB &#8599;</a>`
+      : g.winnerSource === 'manual'
+        ? `<span class="hint">set by an admin</span>`
+        : unresolved ? `<span class="hint">awaiting admin review</span>` : '';
     const detail = isExpanded ? `
       <div class="game-detail">
         <div class="gd-row"><span>Duration</span><span>${dur(g.durationSeconds)} &middot; ${g.turns} turns</span></div>
         ${g.players.map(p => `
           <div class="gd-row">
-            <span><span class="wl-badge ${!g.isDraw && p.playerId === g.winnerPlayerId ? 'w' : ''}">${g.isDraw ? 'D' : (p.playerId === g.winnerPlayerId ? 'W' : 'L')}</span><span class="name-raw">${esc(p.playerName)}</span></span>
+            <span><span class="wl-badge ${!g.isDraw && !unresolved && p.playerId === g.winnerPlayerId ? 'w' : ''}">${unresolved ? '?' : g.isDraw ? 'D' : (p.playerId === g.winnerPlayerId ? 'W' : 'L')}</span><span class="name-raw">${esc(p.playerName)}</span></span>
             <span>${p.shots} shots &middot; ${p.turns} turns</span>
           </div>`).join('')}
-        <div class="gd-row"><span></span><a class="dl-link" href="${g.replayDownloadUrl}">[&darr;] download replay</a></div>
+        <div class="gd-row"><span>${provenance}</span><a class="dl-link" href="${g.replayDownloadUrl}">[&darr;] download replay</a></div>
       </div>` : '';
     return row + detail;
   }).join('');

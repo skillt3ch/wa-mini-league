@@ -84,19 +84,31 @@ async function loadPanel() {
 
   if (!games.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; return; }
 
-  panel.innerHTML = games.map(g => `
+  // Unresolved games (WADB couldn't determine a winner) need attention —
+  // surface them first rather than buried in chronological order.
+  const sorted = [...games].sort((a, b) =>
+    (a.outcomeStatus === 'unresolved' ? 0 : 1) - (b.outcomeStatus === 'unresolved' ? 0 : 1)
+  );
+
+  panel.innerHTML = sorted.map(g => `
     <div class="gamecard" data-id="${g.id}">
       <div class="top">
         <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
-        <span class="meta">#${g.id} &middot; ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'date unknown'}</span>
+        <span class="meta">
+          ${g.outcomeStatus === 'unresolved' ? '<span class="unresolved-tag">Needs review</span> &middot; ' : ''}
+          #${g.id} &middot; ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'date unknown'}
+          ${g.winnerSource ? ` &middot; ${g.winnerSource === 'wadb' ? 'verified via WADB' : 'set manually'}` : ''}
+        </span>
       </div>
       <div class="row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <select class="winner-select name-raw">
-          ${g.players.map(p => `<option value="${p.playerId}" ${!g.isDraw && p.playerName === g.winnerName ? 'selected' : ''}>${esc(p.playerName)}</option>`).join('')}
+          <option value="" ${g.outcomeStatus === 'unresolved' ? 'selected' : ''} disabled>-- choose winner --</option>
+          ${g.players.map(p => `<option value="${p.playerId}" ${!g.isDraw && p.playerId === g.winnerPlayerId ? 'selected' : ''}>${esc(p.playerName)}</option>`).join('')}
           <option value="draw" ${g.isDraw ? 'selected' : ''}>Draw</option>
         </select>
         <button class="opt save-btn">Save</button>
         <button class="opt danger delete-btn">Delete</button>
+        ${g.wadbUrl ? `<a href="${g.wadbUrl}" target="_blank" rel="noopener">WADB &#8599;</a>` : ''}
         <a href="${g.replayDownloadUrl}" style="margin-left:auto;">download replay</a>
       </div>
       <div class="save-msg"></div>

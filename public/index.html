@@ -25,7 +25,7 @@
 <div class="wrap">
   <header class="tool-header">
     <h1>Submit a Result</h1>
-    <p>Drop a replay in, confirm who's who, pick the winner, and submit. Everything's parsed locally in your browser until you hit submit.</p>
+    <p>Drop a replay in, confirm who's who, and submit. The winner is verified automatically — nothing to pick. Everything's parsed locally in your browser until you hit submit.</p>
   </header>
   <nav class="tab-bar">
     <a href="/" class="active">Submit</a>
@@ -56,7 +56,6 @@ let knownPlayers = [];
 let parsed = null;
 let players = null;   // playersFromParsed(parsed)
 let mapping = [];      // per-player { playerId|null, newName|null }
-let winnerChoice = null; // index or 'draw'
 let currentFile = null;
 
 fetch('/api/players').then(r => r.json()).then(list => { knownPlayers = list; }).catch(() => {});
@@ -83,7 +82,6 @@ function load(f) {
       parsed = parseWAGame(fr.result);
       players = playersFromParsed(parsed);
       mapping = players.map(() => ({ playerId: null, newName: null }));
-      winnerChoice = null;
       render();
     } catch (ex) {
       out.hidden = true;
@@ -126,14 +124,9 @@ function render() {
     </div>`;
   });
   html += `</section>
-  <section><div class="shead"><h2>Result</h2><div class="rule"></div></div>
-    <div class="opts">
-      ${players.map((p, i) => `<button class="opt winner-opt name-raw" data-w="${i}" aria-pressed="${winnerChoice === i}">${esc(p.rawName)}</button>`).join('')}
-      <button class="opt winner-opt" data-w="draw" aria-pressed="${winnerChoice === 'draw'}">Draw</button>
-    </div>
-    <div style="margin-top:18px;">
-      <button class="opt primary" id="submitBtn">Submit result</button>
-    </div>
+  <section>
+    <p class="hint">The winner is verified automatically once you submit — it's read from the replay by actually running the game, not guessed. If it can't be determined, it'll show up for an admin to confirm.</p>
+    <button class="opt primary" id="submitBtn">Confirm &amp; submit</button>
     <div id="submitMsg"></div>
   </section>`;
 
@@ -157,13 +150,6 @@ function render() {
       mapping[i].newName = e.target.value;
     });
   });
-  out.querySelectorAll('.winner-opt').forEach(b => {
-    b.addEventListener('click', () => {
-      winnerChoice = b.dataset.w === 'draw' ? 'draw' : +b.dataset.w;
-      out.querySelectorAll('.winner-opt').forEach(x => x.setAttribute('aria-pressed', 'false'));
-      b.setAttribute('aria-pressed', 'true');
-    });
-  });
   document.getElementById('submitBtn').addEventListener('click', submit);
 }
 
@@ -177,14 +163,10 @@ async function submit() {
       return;
     }
   }
-  if (winnerChoice === null) {
-    msg.innerHTML = `<div class="err">Pick a winner (or draw) before submitting.</div>`;
-    return;
-  }
 
   const submitBtn = document.getElementById('submitBtn');
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Submitting...';
+  submitBtn.textContent = 'Verifying winner & submitting...';
 
   const fd = new FormData();
   fd.append('file', currentFile, currentFile.name);
@@ -204,18 +186,23 @@ async function submit() {
     playerId: mapping[i].playerId,
     newPlayerName: mapping[i].newName
   }))));
-  fd.append('winner', winnerChoice === 'draw' ? 'draw' : String(winnerChoice));
 
   try {
     const res = await fetch('/api/submit', { method: 'POST', body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Submission failed.');
-    msg.innerHTML = `<div class="ok">Submitted. <a href="/standings.html">View standings &rarr;</a></div>`;
+
+    let outcomeLine;
+    if (data.outcomeStatus === 'confirmed') outcomeLine = `Winner: <b class="name-raw">${esc(data.winnerName)}</b>`;
+    else if (data.outcomeStatus === 'draw') outcomeLine = `Result: Draw`;
+    else outcomeLine = `Winner couldn't be auto-verified — an admin will confirm it.`;
+
+    msg.innerHTML = `<div class="ok">Submitted. ${outcomeLine} &middot; <a href="/standings.html">View standings &rarr;</a></div>`;
     submitBtn.textContent = 'Submitted';
   } catch (ex) {
     msg.innerHTML = `<div class="err">${esc(ex.message)}</div>`;
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit result';
+    submitBtn.textContent = 'Confirm & submit';
   }
 }
 </script>

@@ -114,6 +114,7 @@ tr:hover td { background: var(--panel-2); }
 .gamecard .meta { font-size: 13.5px; color: var(--fg-dim); margin-top: 4px; }
 .winner-tag { color: var(--accent-2); }
 .draw-tag { color: var(--fg-dim); }
+.unresolved-tag { color: var(--err); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 
 .admin-login { max-width: 400px; margin: 70px auto; text-align: center; }
 .admin-login input {
