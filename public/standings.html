@@ -37,19 +37,31 @@
     <a href="/admin.html">Admin</a>
   </nav>
 
-  <section>
-    <div class="shead"><h2>Ladder</h2><div class="rule"></div></div>
-    <table id="ladder">
-      <thead><tr><th>#</th><th>Player</th><th>Played</th><th>Wins</th><th>Losses</th><th>Win rate</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <div id="ladderEmpty" class="hint" hidden>No games submitted yet.</div>
-  </section>
+  <div id="updatedLine" class="updated-line" hidden></div>
+
+  <div class="filter-row">
+    <input type="text" id="search" class="search-input" placeholder="Search player name...">
+    <div class="filter-btns">
+      <button class="opt small date-btn" data-range="all" aria-pressed="true">All time</button>
+      <button class="opt small date-btn" data-range="week" aria-pressed="false">This week</button>
+      <button class="opt small date-btn" data-range="today" aria-pressed="false">Today</button>
+    </div>
+  </div>
 
   <section>
-    <div class="shead"><h2>Games</h2><div class="rule"></div></div>
-    <div id="games"></div>
-    <div id="gamesEmpty" class="hint" hidden>No games submitted yet.</div>
+    <div class="shead sticky"><h2>Ladder</h2><div class="rule"></div></div>
+    <p class="subtle-hint">Sorted by <b>win rate</b> first, <b>total wins</b> as the tiebreaker (a 5-win 100% record outranks a 3-win 100% record).</p>
+    <div id="ladderWrap">
+      <div class="loading-line">&gt; loading standings</div>
+    </div>
+  </section>
+
+  <section id="games-section">
+    <div class="shead sticky"><h2>Games</h2><div class="rule"></div></div>
+    <div id="playerFilterChip"></div>
+    <div id="gamesWrap">
+      <div class="loading-line">&gt; loading games</div>
+    </div>
   </section>
 </div>
 
@@ -64,43 +76,215 @@ function fmtDate(iso) {
   if (!iso) return 'date unknown';
   return new Date(iso).toISOString().slice(0, 10).replace(/-/g, '.');
 }
-
-async function loadLadder() {
-  const rows = await fetch('/api/standings').then(r => r.json());
-  const tbody = document.querySelector('#ladder tbody');
-  if (!rows.length) { document.getElementById('ladderEmpty').hidden = false; return; }
-  tbody.innerHTML = rows.map((r, i) => `
-    <tr>
-      <td class="rank">${i + 1}</td>
-      <td class="name-raw">${esc(r.name)}</td>
-      <td>${r.gamesPlayed}</td>
-      <td>${r.wins}</td>
-      <td>${r.losses}</td>
-      <td>${r.winRate}%</td>
-    </tr>
-  `).join('');
+function isToday(iso) {
+  if (!iso) return false;
+  const d = new Date(iso), now = new Date();
+  return d.toDateString() === now.toDateString();
+}
+function isThisWeek(iso) {
+  if (!iso) return false;
+  const d = new Date(iso).getTime();
+  return d >= Date.now() - 7 * 24 * 60 * 60 * 1000;
 }
 
-async function loadGames() {
-  const games = await fetch('/api/games').then(r => r.json());
-  const container = document.getElementById('games');
-  if (!games.length) { document.getElementById('gamesEmpty').hidden = false; return; }
-  container.innerHTML = games.map(g => `
-    <div class="gamecard">
-      <div class="top">
-        <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
-        <span class="${g.isDraw ? 'draw-tag' : 'winner-tag'} name-raw">${g.isDraw ? 'Draw' : 'Winner: ' + esc(g.winnerName)}</span>
-      </div>
-      <div class="meta">
-        ${fmtDate(g.playedAt)} &middot; ${dur(g.durationSeconds)} played &middot; ${g.turns} turns
-        &middot; <a href="${g.replayDownloadUrl}">download replay</a>
-      </div>
-    </div>
-  `).join('');
+const QUALIFIED_THRESHOLD = 5;
+
+const ladderWrap = document.getElementById('ladderWrap');
+const gamesWrap = document.getElementById('gamesWrap');
+const searchInput = document.getElementById('search');
+const chipEl = document.getElementById('playerFilterChip');
+const updatedLine = document.getElementById('updatedLine');
+
+let standings = [];
+let games = [];
+let streaks = new Map();
+let searchTerm = '';
+let dateRange = 'all';
+let playerFilter = null;   // { id, name } | null
+const expanded = new Set();
+
+function computeStreaks(list) {
+  const map = new Map();
+  // `list` is already sorted most-recent-first by the API.
+  for (const g of list) {
+    for (const p of g.players) {
+      const arr = map.get(p.playerId) || [];
+      if (arr.length < 5) {
+        arr.push(g.isDraw ? 'D' : (p.playerId === g.winnerPlayerId ? 'W' : 'L'));
+      }
+      map.set(p.playerId, arr);
+    }
+  }
+  for (const arr of map.values()) arr.reverse(); // oldest -> most recent, left to right
+  return map;
 }
 
-loadLadder();
-loadGames();
+function streakHtml(playerId) {
+  const arr = streaks.get(playerId) || [];
+  if (!arr.length) return '<span class="hint">-</span>';
+  return `<span class="streak">${arr.map(r =>
+    `<span class="${r.toLowerCase()}" title="${r === 'W' ? 'Win' : r === 'L' ? 'Loss' : 'Draw'}">${r}</span>`
+  ).join('')}</span>`;
+}
+
+function renderLadder() {
+  if (!standings.length) {
+    ladderWrap.innerHTML = `
+      <div class="empty-state">
+        <span class="mark">Æ</span>
+        <div class="line">no results logged yet - submit the first replay</div>
+      </div>`;
+    return;
+  }
+  const ranked = standings.map((r, i) => ({ ...r, rank: i + 1 }));
+  const term = searchTerm.trim().toLowerCase();
+  const filtered = term ? ranked.filter(r => r.name.toLowerCase().includes(term)) : ranked;
+
+  if (!filtered.length) {
+    ladderWrap.innerHTML = `<div class="hint">No players match "${esc(searchTerm)}".</div>`;
+    return;
+  }
+
+  ladderWrap.innerHTML = `
+    <table id="ladder">
+      <thead><tr><th>#</th><th>Player</th><th>Streak</th><th>W-L</th><th>Win rate</th></tr></thead>
+      <tbody>
+        ${filtered.map(r => {
+          const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
+          const qualified = r.gamesPlayed >= QUALIFIED_THRESHOLD;
+          return `
+          <tr class="${rankClass} fade-in">
+            <td class="rank" data-label="#">${r.rank}</td>
+            <td data-label="Player">
+              <button class="player-link name-raw" data-id="${r.playerId}" data-name="${esc(r.name)}">${esc(r.name)}</button>
+              <span class="played-badge ${qualified ? 'qualified' : 'low-sample'}" title="${qualified ? 'Qualified sample size' : `Small sample (fewer than ${QUALIFIED_THRESHOLD} games)`}">${r.gamesPlayed} played</span>
+            </td>
+            <td data-label="Streak">${streakHtml(r.playerId)}</td>
+            <td data-label="W-L">${r.wins}-${r.losses}</td>
+            <td data-label="Win rate">
+              <div class="rate-cell">
+                <div class="rate-bar"><i style="width:${r.winRate}%"></i></div>
+                <span>${r.winRate}%</span>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  ladderWrap.querySelectorAll('.player-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      playerFilter = { id: +btn.dataset.id, name: btn.dataset.name };
+      renderGames();
+      document.getElementById('games-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+function gameMatchesFilters(g) {
+  if (dateRange === 'today' && !isToday(g.playedAt || g.submittedAt)) return false;
+  if (dateRange === 'week' && !isThisWeek(g.playedAt || g.submittedAt)) return false;
+  if (playerFilter && !g.players.some(p => p.playerId === playerFilter.id)) return false;
+  const term = searchTerm.trim().toLowerCase();
+  if (term && !g.players.some(p => p.playerName.toLowerCase().includes(term))) return false;
+  return true;
+}
+
+function renderGames() {
+  chipEl.innerHTML = playerFilter
+    ? `<div class="active-filter">Showing games for <span class="name-raw">${esc(playerFilter.name)}</span>
+        <button class="opt small" id="clearFilterBtn">Clear</button></div>`
+    : '';
+  if (playerFilter) {
+    document.getElementById('clearFilterBtn').addEventListener('click', () => {
+      playerFilter = null;
+      renderGames();
+    });
+  }
+
+  if (!games.length) {
+    gamesWrap.innerHTML = `
+      <div class="empty-state">
+        <span class="mark">Æ</span>
+        <div class="line">no games logged yet</div>
+      </div>`;
+    return;
+  }
+
+  const filtered = games.filter(gameMatchesFilters);
+  if (!filtered.length) {
+    gamesWrap.innerHTML = `<div class="hint">No games match the current filters.</div>`;
+    return;
+  }
+
+  gamesWrap.innerHTML = filtered.map(g => {
+    const isExpanded = expanded.has(g.id);
+    const row = `
+      <button class="game-row fade-in" data-id="${g.id}" aria-expanded="${isExpanded}">
+        <span class="gr-players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
+        <span class="gr-right">
+          <span class="${g.isDraw ? 'draw-tag' : 'winner-tag'} name-raw gr-meta">${g.isDraw ? 'Draw' : esc(g.winnerName)}</span>
+          <span class="gr-meta">${fmtDate(g.playedAt)}</span>
+          <span class="gr-caret">&#9656;</span>
+        </span>
+      </button>`;
+    const detail = isExpanded ? `
+      <div class="game-detail">
+        <div class="gd-row"><span>Duration</span><span>${dur(g.durationSeconds)} &middot; ${g.turns} turns</span></div>
+        ${g.players.map(p => `
+          <div class="gd-row">
+            <span><span class="wl-badge ${!g.isDraw && p.playerId === g.winnerPlayerId ? 'w' : ''}">${g.isDraw ? 'D' : (p.playerId === g.winnerPlayerId ? 'W' : 'L')}</span><span class="name-raw">${esc(p.playerName)}</span></span>
+            <span>${p.shots} shots &middot; ${p.turns} turns</span>
+          </div>`).join('')}
+        <div class="gd-row"><span></span><a class="dl-link" href="${g.replayDownloadUrl}">[&darr;] download replay</a></div>
+      </div>` : '';
+    return row + detail;
+  }).join('');
+
+  gamesWrap.querySelectorAll('.game-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = +btn.dataset.id;
+      if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+      renderGames();
+    });
+  });
+}
+
+searchInput.addEventListener('input', e => {
+  searchTerm = e.target.value;
+  renderLadder();
+  renderGames();
+});
+
+document.querySelectorAll('.date-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    dateRange = btn.dataset.range;
+    document.querySelectorAll('.date-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+    renderGames();
+  });
+});
+
+async function load() {
+  try {
+    const [standingsRes, gamesRes] = await Promise.all([
+      fetch('/api/standings').then(r => r.json()),
+      fetch('/api/games').then(r => r.json())
+    ]);
+    standings = standingsRes;
+    games = gamesRes;
+    streaks = computeStreaks(games);
+    renderLadder();
+    renderGames();
+    updatedLine.innerHTML = `Last updated <span class="accent-2">${new Date().toLocaleTimeString()}</span>`;
+    updatedLine.hidden = false;
+  } catch (ex) {
+    ladderWrap.innerHTML = `<div class="err">Could not load standings.</div>`;
+    gamesWrap.innerHTML = `<div class="err">Could not load games.</div>`;
+  }
+}
+
+load();
 </script>
 </body>
 </html>
