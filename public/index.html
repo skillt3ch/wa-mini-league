@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Submit Game | WA Mini League</title>
+<link href="https://fonts.cdnfonts.com/css/perfect-dos-vga-437" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark">Æ</span>
+      <span class="brand-name">WA Mini League</span>
+    </a>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="tool-header">
+    <h1>Submit a Result</h1>
+    <p>Drop a .WAgame replay in - teams and players get parsed locally in-browser, nothing uploaded until you hit submit. Confirm who's who, pick the winner, submit.</p>
+    <div class="tag-strip">
+      <div class="tag">.WAGAME</div>
+      <div class="tag">PARSED LOCALLY</div>
+      <div class="tag">MANUAL WINNER</div>
+    </div>
+  </header>
+  <nav class="tab-bar">
+    <a href="/" class="active">Submit</a>
+    <a href="/standings.html">Standings</a>
+    <a href="/admin.html">Admin</a>
+  </nav>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a replay file">
+    <div class="big">Click to choose a <b>.WAgame</b> file, or drag &amp; drop it here</div>
+    <div class="sub">parsed locally - nothing leaves this machine until you submit</div>
+  </div>
+  <input type="file" id="file" accept=".WAgame">
+  <div id="err"></div>
+
+  <main id="out" hidden></main>
+</div>
+
+<script type="module">
+import { parseWAGame, playersFromParsed } from '/js/parser.js';
+import { suggestPlayers } from '/js/similarity.js';
+
+const drop = document.getElementById('drop'),
+      fileInput = document.getElementById('file'),
+      errEl = document.getElementById('err'),
+      out = document.getElementById('out');
+
+let knownPlayers = [];
+let parsed = null;
+let players = null;   // playersFromParsed(parsed)
+let mapping = [];      // per-player { playerId|null, newName|null }
+let winnerChoice = null; // index or 'draw'
+let currentFile = null;
+
+fetch('/api/players').then(r => r.json()).then(list => { knownPlayers = list; }).catch(() => {});
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) load(e.target.files[0]); });
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('hot'); }));
+drop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+const COLOUR_HEX = { Red:'#DE4343', Blue:'#4A6FE0', Green:'#4FBF52', Yellow:'#E0BE2C', Magenta:'#C555C0', Cyan:'#4FC3C9' };
+
+function load(f) {
+  errEl.innerHTML = '';
+  currentFile = f;
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      parsed = parseWAGame(fr.result);
+      players = playersFromParsed(parsed);
+      mapping = players.map(() => ({ playerId: null, newName: null }));
+      winnerChoice = null;
+      render();
+    } catch (ex) {
+      out.hidden = true;
+      errEl.innerHTML = `<div class="err">${esc(ex.message)}</div>`;
+    }
+  };
+  fr.onerror = () => { errEl.innerHTML = `<div class="err">Could not read that file.</div>`; };
+  fr.readAsArrayBuffer(f);
+}
+
+function render() {
+  let html = `<section><div class="shead"><h2>Players in this replay</h2><div class="rule"></div></div>`;
+  players.forEach((p, i) => {
+    const suggestions = suggestPlayers(p.rawName, knownPlayers).filter(s => s.score > 0.35).slice(0, 5);
+    const best = suggestions[0];
+    // Default every player to something valid so submitting doesn't require
+    // touching every dropdown: a confident match gets pre-selected, and if
+    // there's no decent match at all (including an empty player DB) we
+    // default to creating a new player from the raw in-game name. Either
+    // way the submitter can still override it via the dropdown.
+    if (mapping[i].playerId === null && mapping[i].newName === null) {
+      if (best && best.score >= 0.6) mapping[i].playerId = best.playerId;
+      else mapping[i].newName = p.rawName;
+    }
+    html += `<div class="card">
+      <div class="row">
+        <span class="swatch" style="background:${COLOUR_HEX[p.colour] || '#556'}"></span>
+        <span class="rawname name-raw">${esc(p.rawName)}</span>
+        <select data-i="${i}" class="player-select">
+          <option value="">-- select player --</option>
+          ${suggestions.map(s => `<option value="${s.playerId}" ${mapping[i].playerId === s.playerId ? 'selected' : ''}>${esc(s.name)} ${s.score >= 0.6 ? '(likely match)' : ''}</option>`).join('')}
+          ${knownPlayers.filter(k => !suggestions.find(s => s.playerId === k.playerId)).map(k => `<option value="${k.playerId}" ${mapping[i].playerId === k.playerId ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}
+          <option value="__new__" ${mapping[i].newName !== null ? 'selected' : ''}>+ New player...</option>
+        </select>
+        <input type="text" class="new-name" data-i="${i}" placeholder="New player name"
+          style="display:${mapping[i].newName !== null ? 'inline-block' : 'none'}"
+          value="${mapping[i].newName ? esc(mapping[i].newName) : esc(p.rawName)}">
+      </div>
+      <div class="hint">team "${esc(p.teamName)}" &middot; ${p.colour} &middot; ${p.shots} shots &middot; ${p.turns} turns</div>
+    </div>`;
+  });
+  html += `</section>
+  <section><div class="shead"><h2>Result</h2><div class="rule"></div></div>
+    <div class="opts">
+      ${players.map((p, i) => `<button class="opt winner-opt name-raw" data-w="${i}" aria-pressed="${winnerChoice === i}">${esc(p.rawName)}</button>`).join('')}
+      <button class="opt winner-opt" data-w="draw" aria-pressed="${winnerChoice === 'draw'}">Draw</button>
+    </div>
+    <div style="margin-top:18px;">
+      <button class="opt primary" id="submitBtn">Submit result</button>
+    </div>
+    <div id="submitMsg"></div>
+  </section>`;
+
+  out.innerHTML = html;
+  out.hidden = false;
+
+  out.querySelectorAll('.player-select').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const i = +e.target.dataset.i;
+      if (e.target.value === '__new__') {
+        mapping[i] = { playerId: null, newName: players[i].rawName };
+      } else {
+        mapping[i] = { playerId: e.target.value ? +e.target.value : null, newName: null };
+      }
+      render();
+    });
+  });
+  out.querySelectorAll('.new-name').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const i = +e.target.dataset.i;
+      mapping[i].newName = e.target.value;
+    });
+  });
+  out.querySelectorAll('.winner-opt').forEach(b => {
+    b.addEventListener('click', () => {
+      winnerChoice = b.dataset.w === 'draw' ? 'draw' : +b.dataset.w;
+      out.querySelectorAll('.winner-opt').forEach(x => x.setAttribute('aria-pressed', 'false'));
+      b.setAttribute('aria-pressed', 'true');
+    });
+  });
+  document.getElementById('submitBtn').addEventListener('click', submit);
+}
+
+async function submit() {
+  const msg = document.getElementById('submitMsg');
+  msg.innerHTML = '';
+
+  for (let i = 0; i < mapping.length; i++) {
+    if (!mapping[i].playerId && !mapping[i].newName) {
+      msg.innerHTML = `<div class="err">Map "${esc(players[i].rawName)}" to a player before submitting.</div>`;
+      return;
+    }
+  }
+  if (winnerChoice === null) {
+    msg.innerHTML = `<div class="err">Pick a winner (or draw) before submitting.</div>`;
+    return;
+  }
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting...';
+
+  const fd = new FormData();
+  fd.append('file', currentFile, currentFile.name);
+  fd.append('meta', JSON.stringify({
+    playedAt: parsed.date ? parsed.date.toISOString() : null,
+    mapType: parsed.mapType,
+    durationSeconds: parsed.durationSeconds,
+    turns: parsed.turns,
+    version: parsed.version
+  }));
+  fd.append('players', JSON.stringify(players.map((p, i) => ({
+    rawName: p.rawName,
+    teamName: p.teamName,
+    colour: p.colour,
+    shots: p.shots,
+    turns: p.turns,
+    playerId: mapping[i].playerId,
+    newPlayerName: mapping[i].newName
+  }))));
+  fd.append('winner', winnerChoice === 'draw' ? 'draw' : String(winnerChoice));
+
+  try {
+    const res = await fetch('/api/submit', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Submission failed.');
+    msg.innerHTML = `<div class="ok">Submitted. <a href="/standings.html">View standings &rarr;</a></div>`;
+    submitBtn.textContent = 'Submitted';
+  } catch (ex) {
+    msg.innerHTML = `<div class="err">${esc(ex.message)}</div>`;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit result';
+  }
+}
+</script>
+</body>
+</html>

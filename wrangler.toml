@@ -1,0 +1,20 @@
+name = "wa-mini-league"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "public"
+
+# D1 database binding — create with:
+#   npx wrangler d1 create wa-mini-league-db
+# then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "wa-mini-league-db"
+database_id = "7d02c358-61c3-4d18-af33-71af7b024f56"
+
+# R2 bucket binding for storing uploaded .WAgame replay files — create with:
+#   npx wrangler r2 bucket create wa-mini-league-replays
+[[r2_buckets]]
+binding = "REPLAYS"
+bucket_name = "wa-mini-league-replays"
+
+# Admin password is set as a secret, NOT here. Run:
+#   npx wrangler pages secret put ADMIN_PASSWORD

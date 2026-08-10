@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Standings | WA Mini League</title>
+<link href="https://fonts.cdnfonts.com/css/perfect-dos-vga-437" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark">Æ</span>
+      <span class="brand-name">WA Mini League</span>
+    </a>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="tool-header">
+    <h1>Standings</h1>
+    <p>Ladder, ranked by win rate first and total wins as the tiebreaker, plus the full log of submitted games.</p>
+    <div class="tag-strip">
+      <div class="tag">LIVE RESULTS</div>
+      <div class="tag">DOWNLOAD REPLAYS</div>
+    </div>
+  </header>
+  <nav class="tab-bar">
+    <a href="/">Submit</a>
+    <a href="/standings.html" class="active">Standings</a>
+    <a href="/admin.html">Admin</a>
+  </nav>
+
+  <section>
+    <div class="shead"><h2>Ladder</h2><div class="rule"></div></div>
+    <table id="ladder">
+      <thead><tr><th>#</th><th>Player</th><th>Played</th><th>Wins</th><th>Losses</th><th>Win rate</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="ladderEmpty" class="hint" hidden>No games submitted yet.</div>
+  </section>
+
+  <section>
+    <div class="shead"><h2>Games</h2><div class="rule"></div></div>
+    <div id="games"></div>
+    <div id="gamesEmpty" class="hint" hidden>No games submitted yet.</div>
+  </section>
+</div>
+
+<script type="module">
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function dur(s) {
+  s = Math.round(s || 0);
+  const m = Math.floor(s / 60);
+  return m ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
+}
+function fmtDate(iso) {
+  if (!iso) return 'date unknown';
+  return new Date(iso).toISOString().slice(0, 10).replace(/-/g, '.');
+}
+
+async function loadLadder() {
+  const rows = await fetch('/api/standings').then(r => r.json());
+  const tbody = document.querySelector('#ladder tbody');
+  if (!rows.length) { document.getElementById('ladderEmpty').hidden = false; return; }
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="rank">${i + 1}</td>
+      <td class="name-raw">${esc(r.name)}</td>
+      <td>${r.gamesPlayed}</td>
+      <td>${r.wins}</td>
+      <td>${r.losses}</td>
+      <td>${r.winRate}%</td>
+    </tr>
+  `).join('');
+}
+
+async function loadGames() {
+  const games = await fetch('/api/games').then(r => r.json());
+  const container = document.getElementById('games');
+  if (!games.length) { document.getElementById('gamesEmpty').hidden = false; return; }
+  container.innerHTML = games.map(g => `
+    <div class="gamecard">
+      <div class="top">
+        <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
+        <span class="${g.isDraw ? 'draw-tag' : 'winner-tag'} name-raw">${g.isDraw ? 'Draw' : 'Winner: ' + esc(g.winnerName)}</span>
+      </div>
+      <div class="meta">
+        ${fmtDate(g.playedAt)} &middot; ${dur(g.durationSeconds)} played &middot; ${g.turns} turns
+        &middot; <a href="${g.replayDownloadUrl}">download replay</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+loadLadder();
+loadGames();
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin | WA Mini League</title>
+<link href="https://fonts.cdnfonts.com/css/perfect-dos-vga-437" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark">Æ</span>
+      <span class="brand-name">WA Mini League</span>
+    </a>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="tool-header">
+    <h1>Admin</h1>
+    <p>Edit or delete submitted games. Changes take effect immediately on standings.</p>
+    <div class="tag-strip">
+      <div class="tag">PASSWORD GATED</div>
+    </div>
+  </header>
+  <nav class="tab-bar">
+    <a href="/">Submit</a>
+    <a href="/standings.html">Standings</a>
+    <a href="/admin.html" class="active">Admin</a>
+  </nav>
+
+  <div id="loginBox" class="admin-login">
+    <p class="hint">Enter the admin password to continue.</p>
+    <input type="password" id="pw" placeholder="Admin password">
+    <button class="opt primary" id="loginBtn" style="width:100%">Unlock</button>
+    <div id="loginErr"></div>
+  </div>
+
+  <main id="panel" hidden></main>
+</div>
+
+<script type="module">
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+const loginBox = document.getElementById('loginBox');
+const panel = document.getElementById('panel');
+const pwInput = document.getElementById('pw');
+
+function getPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
+function setPw(v) { sessionStorage.setItem('wa_admin_pw', v); }
+
+async function tryUnlock(pw) {
+  const res = await fetch('/api/admin/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw })
+  });
+  if (!res.ok) return false;
+  setPw(pw);
+  loginBox.hidden = true;
+  panel.hidden = false;
+  loadPanel();
+  return true;
+}
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const ok = await tryUnlock(pwInput.value);
+  if (!ok) document.getElementById('loginErr').innerHTML = `<div class="err">Wrong password.</div>`;
+});
+pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginBtn').click(); });
+
+// If a password is already stored in this browser tab's session, try it silently.
+if (getPw()) tryUnlock(getPw());
+
+async function loadPanel() {
+  const [games, players] = await Promise.all([
+    fetch('/api/games').then(r => r.json()),
+    fetch('/api/players').then(r => r.json())
+  ]);
+
+  if (!games.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; return; }
+
+  panel.innerHTML = games.map(g => `
+    <div class="gamecard" data-id="${g.id}">
+      <div class="top">
+        <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
+        <span class="meta">#${g.id} &middot; ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'date unknown'}</span>
+      </div>
+      <div class="row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <select class="winner-select name-raw">
+          ${g.players.map(p => `<option value="${p.playerId}" ${!g.isDraw && p.playerName === g.winnerName ? 'selected' : ''}>${esc(p.playerName)}</option>`).join('')}
+          <option value="draw" ${g.isDraw ? 'selected' : ''}>Draw</option>
+        </select>
+        <button class="opt save-btn">Save</button>
+        <button class="opt danger delete-btn">Delete</button>
+        <a href="${g.replayDownloadUrl}" style="margin-left:auto;">download replay</a>
+      </div>
+      <div class="save-msg"></div>
+    </div>
+  `).join('');
+
+  panel.querySelectorAll('.gamecard').forEach(card => {
+    const id = card.dataset.id;
+    card.querySelector('.save-btn').addEventListener('click', async () => {
+      const sel = card.querySelector('.winner-select');
+      const msg = card.querySelector('.save-msg');
+      const isDraw = sel.value === 'draw';
+      const res = await fetch(`/api/admin/games/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': getPw() },
+        body: JSON.stringify({ isDraw, winnerPlayerId: isDraw ? null : Number(sel.value) })
+      });
+      const data = await res.json();
+      msg.innerHTML = res.ok ? `<div class="ok">Saved.</div>` : `<div class="err">${esc(data.error)}</div>`;
+    });
+    card.querySelector('.delete-btn').addEventListener('click', async () => {
+      if (!confirm('Delete this game submission? This cannot be undone.')) return;
+      const res = await fetch(`/api/admin/games/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Password': getPw() }
+      });
+      if (res.ok) card.remove();
+      else {
+        const data = await res.json();
+        card.querySelector('.save-msg').innerHTML = `<div class="err">${esc(data.error)}</div>`;
+      }
+    });
+  });
+}
+</script>
+</body>
+</html>
