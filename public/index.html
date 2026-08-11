@@ -25,7 +25,7 @@
 <div class="wrap">
   <header class="tool-header">
     <h1>Submit a Result</h1>
-    <p>Drop a replay in, confirm who's who, and submit. The winner is verified automatically — nothing to pick. Everything's parsed locally in your browser until you hit submit.</p>
+    <p>Drop a replay in, confirm who's who, and submit. The winner is verified automatically.</p>
   </header>
   <nav class="tab-bar">
     <a href="/" class="active">Submit</a>
@@ -120,12 +120,12 @@ function render() {
           style="display:${mapping[i].newName !== null ? 'inline-block' : 'none'}"
           value="${mapping[i].newName ? esc(mapping[i].newName) : esc(p.rawName)}">
       </div>
-      <div class="hint">team "${esc(p.teamName)}" &middot; ${p.colour} &middot; ${p.shots} shots &middot; ${p.turns} turns</div>
+      <div class="hint">team "<span class="name-raw">${esc(p.teamName)}</span>" &middot; ${p.colour} &middot; ${p.shots} shots &middot; ${p.turns} turns</div>
     </div>`;
   });
   html += `</section>
   <section>
-    <p class="hint">The winner is verified automatically once you submit — it's read from the replay by actually running the game, not guessed. If it can't be determined, it'll show up for an admin to confirm.</p>
+    <p class="hint name-raw">The winner is verified automatically once you submit - it's read from the replay by actually running the game, not guessed. If it can't be determined, it'll show up for an admin to confirm.</p>
     <button class="opt primary" id="submitBtn">Confirm &amp; submit</button>
     <div id="submitMsg"></div>
   </section>`;
@@ -195,7 +195,7 @@ async function submit() {
     let outcomeLine;
     if (data.outcomeStatus === 'confirmed') outcomeLine = `Winner: <b class="name-raw">${esc(data.winnerName)}</b>`;
     else if (data.outcomeStatus === 'draw') outcomeLine = `Result: Draw`;
-    else outcomeLine = `Winner couldn't be auto-verified — an admin will confirm it.`;
+    else outcomeLine = `<span class="name-raw">Winner couldn't be auto-verified - an admin will confirm it.</span>`;
 
     msg.innerHTML = `<div class="ok">Submitted. ${outcomeLine} &middot; <a href="/standings.html">View standings &rarr;</a></div>`;
     submitBtn.textContent = 'Submitted';

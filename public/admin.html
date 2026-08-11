@@ -47,6 +47,12 @@
     </div>
   </div>
   <main id="panel" hidden></main>
+
+  <section id="playersSection" hidden>
+    <div class="shead"><h2>Players</h2><div class="rule"></div></div>
+    <p class="hint">Merge duplicate names (e.g. a rename that didn't get matched), or delete a player outright once they have no games left.</p>
+    <main id="playersPanel"></main>
+  </section>
 </div>
 
 <script type="module">
@@ -56,8 +62,11 @@ const loginBox = document.getElementById('loginBox');
 const panel = document.getElementById('panel');
 const pwInput = document.getElementById('pw');
 const sortRow = document.getElementById('sortRow');
+const playersSection = document.getElementById('playersSection');
+const playersPanel = document.getElementById('playersPanel');
 
 let allGames = [];
+let allPlayers = [];
 let sortMode = 'added'; // 'added' | 'played'
 
 function getPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
@@ -74,7 +83,9 @@ async function tryUnlock(pw) {
   loginBox.hidden = true;
   panel.hidden = false;
   sortRow.hidden = false;
+  playersSection.hidden = false;
   loadPanel();
+  loadPlayers();
   return true;
 }
 
@@ -181,6 +192,79 @@ function renderPanel() {
       } else {
         const data = await res.json();
         card.querySelector('.save-msg').innerHTML = `<div class="err">${esc(data.error)}</div>`;
+      }
+    });
+  });
+}
+
+async function loadPlayers() {
+  const res = await fetch('/api/admin/players', { headers: { 'X-Admin-Password': getPw() } });
+  allPlayers = res.ok ? await res.json() : [];
+  renderPlayers();
+}
+
+function renderPlayers() {
+  if (!allPlayers.length) { playersPanel.innerHTML = `<div class="hint">No players yet.</div>`; return; }
+
+  playersPanel.innerHTML = allPlayers.map(p => `
+    <div class="gamecard" data-id="${p.playerId}">
+      <div class="top">
+        <span class="players name-raw">${esc(p.name)}</span>
+        <span class="meta">
+          ${p.gameCount} game${p.gameCount === 1 ? '' : 's'}
+          ${p.aliases.length ? ` &middot; aliases: <span class="name-raw">${p.aliases.map(esc).join(', ')}</span>` : ''}
+        </span>
+      </div>
+      <div class="row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <select class="merge-select name-raw">
+          <option value="">-- merge into --</option>
+          ${allPlayers.filter(o => o.playerId !== p.playerId).map(o => `<option value="${o.playerId}">${esc(o.name)}</option>`).join('')}
+        </select>
+        <button class="opt merge-btn">Merge</button>
+        <button class="opt danger delete-player-btn" ${p.gameCount > 0 ? 'disabled title="Has games — merge instead of deleting"' : ''}>Delete</button>
+      </div>
+      <div class="save-msg"></div>
+    </div>
+  `).join('');
+
+  playersPanel.querySelectorAll('.gamecard').forEach(card => {
+    const id = Number(card.dataset.id);
+    const msg = card.querySelector('.save-msg');
+
+    card.querySelector('.merge-btn').addEventListener('click', async () => {
+      const sel = card.querySelector('.merge-select');
+      const intoId = Number(sel.value);
+      if (!intoId) { msg.innerHTML = `<div class="err">Choose a player to merge into first.</div>`; return; }
+      const fromName = allPlayers.find(x => x.playerId === id)?.name || '';
+      const intoName = allPlayers.find(x => x.playerId === intoId)?.name || '';
+      if (!confirm(`Merge "${fromName}" into "${intoName}"? All of "${fromName}"'s games and aliases move to "${intoName}", and "${fromName}" is deleted. This cannot be undone.`)) return;
+
+      const res = await fetch('/api/admin/players/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': getPw() },
+        body: JSON.stringify({ fromId: id, intoId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await Promise.all([loadPlayers(), loadPanel()]);
+      } else {
+        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+      }
+    });
+
+    card.querySelector('.delete-player-btn').addEventListener('click', async () => {
+      const name = allPlayers.find(x => x.playerId === id)?.name || '';
+      if (!confirm(`Delete player "${name}"? This cannot be undone.`)) return;
+      const res = await fetch(`/api/admin/players/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Password': getPw() }
+      });
+      if (res.ok) {
+        allPlayers = allPlayers.filter(x => x.playerId !== id);
+        renderPlayers();
+      } else {
+        const data = await res.json();
+        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
       }
     });
   });

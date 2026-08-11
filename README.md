@@ -4,7 +4,7 @@ A tiny 3-page site for tracking a Worms Armageddon mini-league from `.WAgame` re
 
 - **`/`** — drop a replay, confirm/map the detected player names, submit. The winner is verified automatically — nothing to pick. Results go live immediately.
 - **`/standings.html`** — ladder (games played / wins / losses / win rate) plus a log of every submitted game with a replay download link and a link to the WADB verification page.
-- **`/admin.html`** — password-gated panel to fix a winner, resolve a game the auto-verification couldn't determine, or delete a bad submission.
+- **`/admin.html`** — password-gated panel to fix a winner, resolve a game the auto-verification couldn't determine, delete a bad submission, or merge/delete duplicate player records.
 
 Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API, D1 (SQLite) for data, R2 for storing the uploaded replay files.
 
@@ -14,7 +14,9 @@ Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API
 - **Winner detection**: a `.WAgame` file doesn't record the outcome itself — WA doesn't store one. On submit, the backend (`functions/api/submit.js`) forwards the replay server-to-server to the [Worms Database API](https://wormsarmageddon.com/developers) (`wormsarmageddon.com`), which actually runs the game engine and returns a real result (`teams[].won` / `winningAllianceColor`), not a guess. That gets matched against the submitted players by team colour to set the winner automatically. If WADB can't determine a result (aborted game, alliance mode, an unreachable/erroring API) the game still saves, just marked `outcome_status = 'unresolved'` — it's excluded from standings until an admin resolves it via the admin panel, so a stuck game never silently skews anyone's record.
 - Player identity across renames (e.g. `dt-Deano` / `Deano` / `dt-Daeno`) is handled by `public/js/similarity.js`: it suggests the most likely existing player (weighted toward the "core" name segment, ignoring clan-tag prefixes/suffixes) but always lets the submitter override or create a new player. Every confirmed raw name gets saved as an alias, so matching gets better over time.
 - Submissions apply immediately — no approval queue. Duplicate uploads are blocked by hashing the replay file (SHA-256) and rejecting a second submission of the same hash.
-- The admin panel is gated by a single shared password (`ADMIN_PASSWORD` secret), used for editing a winner/draw, resolving an unreviewed game, and deleting a submission. Any manual edit is tagged `winner_source = 'manual'` so it's clear on the game log that it wasn't WADB-verified.
+- The admin panel is gated by a single shared password (`ADMIN_PASSWORD` secret), used for editing a winner/draw, resolving an unreviewed game, deleting a submission, and merging/deleting player records. Any manual edit is tagged `winner_source = 'manual'` so it's clear on the game log that it wasn't WADB-verified.
+- Player identity cleanup: the fuzzy matcher on submit is a suggestion, not a guarantee, so duplicates can slip in (e.g. "Stoned-Worm" vs "StonedWorm" both getting created because neither matched confidently). The admin panel's Players section fixes this after the fact — **Merge** reassigns every game, win, and alias from one player onto another and deletes the duplicate; **Delete** removes a player outright, but only once they have zero games attached (merge first if they don't).
+- Text with special/Latin-1 characters (team names, certain player names, and any UI copy with an em dash) is rendered in JetBrains Mono via the `.name-raw` class rather than the DOS bitmap font, since Perfect DOS VGA 437 mis-renders a number of those codepoints.
 
 ## Setup
 
