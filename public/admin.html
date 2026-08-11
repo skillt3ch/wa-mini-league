@@ -40,6 +40,12 @@
     <div id="loginErr"></div>
   </div>
 
+  <div id="sortRow" class="filter-row" hidden>
+    <div class="filter-btns">
+      <button class="opt small sort-btn" data-sort="added" aria-pressed="true">Date added</button>
+      <button class="opt small sort-btn" data-sort="played" aria-pressed="false">Date played</button>
+    </div>
+  </div>
   <main id="panel" hidden></main>
 </div>
 
@@ -49,6 +55,10 @@ function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;'
 const loginBox = document.getElementById('loginBox');
 const panel = document.getElementById('panel');
 const pwInput = document.getElementById('pw');
+const sortRow = document.getElementById('sortRow');
+
+let allGames = [];
+let sortMode = 'added'; // 'added' | 'played'
 
 function getPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
 function setPw(v) { sessionStorage.setItem('wa_admin_pw', v); }
@@ -63,9 +73,19 @@ async function tryUnlock(pw) {
   setPw(pw);
   loginBox.hidden = true;
   panel.hidden = false;
+  sortRow.hidden = false;
   loadPanel();
   return true;
 }
+
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sortMode = btn.dataset.sort;
+    document.querySelectorAll('.sort-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+    renderPanel();
+  });
+});
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const ok = await tryUnlock(pwInput.value);
@@ -77,18 +97,24 @@ pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getEl
 if (getPw()) tryUnlock(getPw());
 
 async function loadPanel() {
-  const [games, players] = await Promise.all([
-    fetch('/api/games').then(r => r.json()),
-    fetch('/api/players').then(r => r.json())
-  ]);
+  allGames = await fetch('/api/games').then(r => r.json());
+  renderPanel();
+}
 
-  if (!games.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; return; }
+function renderPanel() {
+  if (!allGames.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; return; }
 
   // Unresolved games (WADB couldn't determine a winner) need attention —
-  // surface them first rather than buried in chronological order.
-  const sorted = [...games].sort((a, b) =>
-    (a.outcomeStatus === 'unresolved' ? 0 : 1) - (b.outcomeStatus === 'unresolved' ? 0 : 1)
-  );
+  // surface them first regardless of sort mode. Within each group, sort by
+  // either upload time (default — surfaces what just came in, even if it's
+  // a replay of an old match) or the in-game date, submitter's choice.
+  const sorted = [...allGames].sort((a, b) => {
+    const unresolvedDiff = (a.outcomeStatus === 'unresolved' ? 0 : 1) - (b.outcomeStatus === 'unresolved' ? 0 : 1);
+    if (unresolvedDiff !== 0) return unresolvedDiff;
+    const aDate = sortMode === 'played' ? (a.playedAt || a.submittedAt) : a.submittedAt;
+    const bDate = sortMode === 'played' ? (b.playedAt || b.submittedAt) : b.submittedAt;
+    return new Date(bDate) - new Date(aDate);
+  });
 
   panel.innerHTML = sorted.map(g => `
     <div class="gamecard" data-id="${g.id}">
@@ -96,7 +122,8 @@ async function loadPanel() {
         <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
         <span class="meta">
           ${g.outcomeStatus === 'unresolved' ? '<span class="unresolved-tag">Needs review</span> &middot; ' : ''}
-          #${g.id} &middot; ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'date unknown'}
+          added ${g.submittedAt ? new Date(g.submittedAt).toISOString().slice(0,10) : 'unknown'}
+          &middot; played ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'unknown'}
           ${g.winnerSource ? ` &middot; ${g.winnerSource === 'wadb' ? 'verified via WADB' : 'set manually'}` : ''}
         </span>
       </div>
@@ -116,18 +143,31 @@ async function loadPanel() {
   `).join('');
 
   panel.querySelectorAll('.gamecard').forEach(card => {
-    const id = card.dataset.id;
+    const id = Number(card.dataset.id);
     card.querySelector('.save-btn').addEventListener('click', async () => {
       const sel = card.querySelector('.winner-select');
       const msg = card.querySelector('.save-msg');
       const isDraw = sel.value === 'draw';
+      const winnerPlayerId = isDraw ? null : Number(sel.value);
       const res = await fetch(`/api/admin/games/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Password': getPw() },
-        body: JSON.stringify({ isDraw, winnerPlayerId: isDraw ? null : Number(sel.value) })
+        body: JSON.stringify({ isDraw, winnerPlayerId })
       });
       const data = await res.json();
-      msg.innerHTML = res.ok ? `<div class="ok">Saved.</div>` : `<div class="err">${esc(data.error)}</div>`;
+      if (res.ok) {
+        msg.innerHTML = `<div class="ok">Saved.</div>`;
+        const g = allGames.find(x => x.id === id);
+        if (g) {
+          g.isDraw = isDraw;
+          g.winnerPlayerId = winnerPlayerId;
+          g.winnerName = g.players.find(p => p.playerId === winnerPlayerId)?.playerName || null;
+          g.outcomeStatus = isDraw ? 'draw' : 'confirmed';
+          g.winnerSource = 'manual';
+        }
+      } else {
+        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+      }
     });
     card.querySelector('.delete-btn').addEventListener('click', async () => {
       if (!confirm('Delete this game submission? This cannot be undone.')) return;
@@ -135,8 +175,10 @@ async function loadPanel() {
         method: 'DELETE',
         headers: { 'X-Admin-Password': getPw() }
       });
-      if (res.ok) card.remove();
-      else {
+      if (res.ok) {
+        card.remove();
+        allGames = allGames.filter(x => x.id !== id);
+      } else {
         const data = await res.json();
         card.querySelector('.save-msg').innerHTML = `<div class="err">${esc(data.error)}</div>`;
       }
