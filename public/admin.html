@@ -146,8 +146,8 @@ function renderPanel() {
         </select>
         <button class="opt save-btn">Save</button>
         <button class="opt danger delete-btn">Delete</button>
-        ${g.wadbUrl ? `<a href="${g.wadbUrl}" target="_blank" rel="noopener">WADB &#8599;</a>` : ''}
-        <a href="${g.replayDownloadUrl}" style="margin-left:auto;">download replay</a>
+        ${g.wadbUrl ? `<a class="dl-link" href="${g.wadbUrl}" target="_blank" rel="noopener">WADB &#8599;</a>` : ''}
+        <a class="dl-link" href="${g.replayDownloadUrl}" style="margin-left:auto;">download replay</a>
       </div>
       <div class="save-msg"></div>
     </div>

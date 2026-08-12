@@ -17,7 +17,15 @@
    the DOS font entirely rather than trying to route around specific glyphs.
    See .name-raw below. */
 
-:root { --panel-2: #0A0A0A; --err: #FF5555; }
+/* --accent-3 is the site's second accent colour (bright CGA magenta),
+   layered on top of theme.css's cyan --accent-2. Used sparingly and only
+   for one purpose: provenance/reference links on a game (the "verified via
+   WADB" link and "download replay") — links that point *away* from the
+   record, as opposed to cyan, which theme.css already uses everywhere for
+   emphasis/highlight (rank-1, qualified badge, win streaks, active state).
+   Keeping magenta scoped to that single link category means it stays a
+   recognisable signal instead of just becoming a second white noise. */
+:root { --panel-2: #0A0A0A; --err: #FF5555; --accent-3: #FF66FF; }
 
 body { font-size: 18px; min-height: 100vh; padding-bottom: 70px; }
 
@@ -209,8 +217,8 @@ tr:hover td { background: var(--panel-2); }
 }
 .wl-badge.w { color: var(--accent-2); border-color: var(--accent-2); }
 
-.dl-link { color: var(--fg-dim); text-decoration: none; border-bottom: 1px dotted var(--border-mid); }
-.dl-link:hover { color: var(--accent-2); border-color: var(--accent-2); }
+.dl-link { color: var(--accent-3); text-decoration: none; border-bottom: 1px dotted var(--accent-3); }
+.dl-link:hover { border-bottom-style: solid; filter: brightness(1.3); }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fadeIn .25s ease both; }

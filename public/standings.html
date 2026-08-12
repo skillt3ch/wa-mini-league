@@ -54,6 +54,12 @@
 
   <section id="games-section">
     <div class="shead sticky"><h2>Games</h2><div class="rule"></div></div>
+    <div class="filter-row">
+      <div class="filter-btns">
+        <button class="opt small game-sort-btn" data-sort="submitted" aria-pressed="true">Newest submitted</button>
+        <button class="opt small game-sort-btn" data-sort="played" aria-pressed="false">Date played</button>
+      </div>
+    </div>
     <div id="playerFilterChip"></div>
     <div id="gamesWrap">
       <div class="loading-line">&gt; loading games</div>
@@ -96,6 +102,7 @@ let games = [];
 let streaks = new Map();
 let searchTerm = '';
 let dateRange = 'all';
+let gameSortMode = 'submitted'; // 'submitted' | 'played'
 let playerFilter = null;   // { id, name } | null
 const expanded = new Set();
 
@@ -179,6 +186,14 @@ function renderLadder() {
   });
 }
 
+function sortedGames() {
+  return [...games].sort((a, b) => {
+    const aDate = gameSortMode === 'played' ? (a.playedAt || a.submittedAt) : a.submittedAt;
+    const bDate = gameSortMode === 'played' ? (b.playedAt || b.submittedAt) : b.submittedAt;
+    return new Date(bDate) - new Date(aDate);
+  });
+}
+
 function gameMatchesFilters(g) {
   if (dateRange === 'today' && !isToday(g.playedAt || g.submittedAt)) return false;
   if (dateRange === 'week' && !isThisWeek(g.playedAt || g.submittedAt)) return false;
@@ -209,7 +224,7 @@ function renderGames() {
     return;
   }
 
-  const filtered = games.filter(gameMatchesFilters);
+  const filtered = sortedGames().filter(gameMatchesFilters);
   if (!filtered.length) {
     gamesWrap.innerHTML = `<div class="hint">No games match the current filters.</div>`;
     return;
@@ -226,7 +241,7 @@ function renderGames() {
         <span class="gr-players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
         <span class="gr-right">
           ${resultTag}
-          <span class="gr-meta">${fmtDate(g.playedAt)}</span>
+          <span class="gr-meta">${gameSortMode === 'played' ? fmtDate(g.playedAt) : fmtDate(g.submittedAt)}</span>
           <span class="gr-caret">&#9656;</span>
         </span>
       </button>`;
@@ -267,6 +282,15 @@ document.querySelectorAll('.date-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     dateRange = btn.dataset.range;
     document.querySelectorAll('.date-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+    renderGames();
+  });
+});
+
+document.querySelectorAll('.game-sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    gameSortMode = btn.dataset.sort;
+    document.querySelectorAll('.game-sort-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
     btn.setAttribute('aria-pressed', 'true');
     renderGames();
   });
