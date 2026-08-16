@@ -256,6 +256,7 @@ tr:hover td { background: var(--panel-2); }
   display: flex; align-items: center; justify-content: center;
   padding: 20px; z-index: 100;
 }
+.modal-backdrop[hidden] { display: none; }
 .modal {
   background: var(--bg-raised); border: 1px solid var(--border-mid);
   max-width: 460px; width: 100%; padding: 22px 24px; max-height: 90vh; overflow-y: auto;

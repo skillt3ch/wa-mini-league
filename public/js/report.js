@@ -15,7 +15,7 @@ if (btn) {
         <h2>Report an issue</h2>
         <button class="modal-close" aria-label="Close">&times;</button>
       </div>
-      <p class="hint">A disputed result, someone acting up, a site bug — whatever it is, this goes straight to the admins, nobody else sees it.</p>
+      <p class="hint name-raw">A disputed result, someone acting up, a site bug - whatever it is, this goes straight to the admins, nobody else sees it.</p>
       <label class="modal-label">Category
         <select id="reportCategory">
           <option value="player">Player behaviour</option>
