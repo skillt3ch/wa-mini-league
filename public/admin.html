@@ -19,6 +19,7 @@
       <span class="brand-mark">Æ</span>
       <span class="brand-name">WA Mini League</span>
     </a>
+    <button id="reportBtn" class="opt small">Report an issue</button>
   </div>
 </header>
 
@@ -48,6 +49,12 @@
   </div>
   <main id="panel" hidden></main>
 
+  <section id="reportsSection" hidden>
+    <div class="shead"><h2>Reports</h2><div class="rule"></div></div>
+    <p class="hint">Submitted via the "Report an issue" button on any page. Open ones are shown first.</p>
+    <main id="reportsPanel"></main>
+  </section>
+
   <section id="playersSection" hidden>
     <div class="shead"><h2>Players</h2><div class="rule"></div></div>
     <p class="hint">Merge duplicate names (e.g. a rename that didn't get matched), or delete a player outright once they have no games left.</p>
@@ -64,10 +71,15 @@ const pwInput = document.getElementById('pw');
 const sortRow = document.getElementById('sortRow');
 const playersSection = document.getElementById('playersSection');
 const playersPanel = document.getElementById('playersPanel');
+const reportsSection = document.getElementById('reportsSection');
+const reportsPanel = document.getElementById('reportsPanel');
 
 let allGames = [];
 let allPlayers = [];
+let allReports = [];
 let sortMode = 'added'; // 'added' | 'played'
+
+const CATEGORY_LABELS = { player: 'Player behaviour', bug: 'Site bug', other: 'Other' };
 
 function getPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
 function setPw(v) { sessionStorage.setItem('wa_admin_pw', v); }
@@ -84,8 +96,10 @@ async function tryUnlock(pw) {
   panel.hidden = false;
   sortRow.hidden = false;
   playersSection.hidden = false;
+  reportsSection.hidden = false;
   loadPanel();
   loadPlayers();
+  loadReports();
   return true;
 }
 
@@ -269,6 +283,76 @@ function renderPlayers() {
     });
   });
 }
+
+async function loadReports() {
+  const res = await fetch('/api/admin/reports', { headers: { 'X-Admin-Password': getPw() } });
+  allReports = res.ok ? await res.json() : [];
+  renderReports();
+}
+
+function renderReports() {
+  if (!allReports.length) { reportsPanel.innerHTML = `<div class="hint">No reports yet.</div>`; return; }
+
+  reportsPanel.innerHTML = allReports.map(r => `
+    <div class="gamecard" data-id="${r.id}">
+      <div class="top">
+        <span class="players">
+          ${CATEGORY_LABELS[r.category] || 'Other'}
+          ${r.status === 'open' ? ' &middot; <span class="unresolved-tag">Open</span>' : ''}
+        </span>
+        <span class="meta">
+          <span class="name-raw">${r.reporterName ? esc(r.reporterName) : 'anonymous'}</span>
+          &middot; ${r.submittedAt ? new Date(r.submittedAt).toISOString().slice(0,10) : 'unknown'}
+          &middot; ip ${esc(r.ipAddress || 'unknown')}
+        </span>
+      </div>
+      <p style="white-space:pre-wrap; color:var(--fg-bright); margin:10px 0 0; font-size:15px;">${esc(r.message)}</p>
+      <div class="row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="opt toggle-status-btn">${r.status === 'open' ? 'Mark resolved' : 'Reopen'}</button>
+        <button class="opt danger delete-report-btn">Delete</button>
+      </div>
+      <div class="save-msg"></div>
+    </div>
+  `).join('');
+
+  reportsPanel.querySelectorAll('.gamecard').forEach(card => {
+    const id = Number(card.dataset.id);
+    const msg = card.querySelector('.save-msg');
+
+    card.querySelector('.toggle-status-btn').addEventListener('click', async () => {
+      const r = allReports.find(x => x.id === id);
+      const newStatus = r.status === 'open' ? 'resolved' : 'open';
+      const res = await fetch(`/api/admin/reports/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': getPw() },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        r.status = newStatus;
+        renderReports();
+      } else {
+        const data = await res.json();
+        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+      }
+    });
+
+    card.querySelector('.delete-report-btn').addEventListener('click', async () => {
+      if (!confirm('Delete this report? This cannot be undone.')) return;
+      const res = await fetch(`/api/admin/reports/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Password': getPw() }
+      });
+      if (res.ok) {
+        allReports = allReports.filter(x => x.id !== id);
+        renderReports();
+      } else {
+        const data = await res.json();
+        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+      }
+    });
+  });
+}
 </script>
+<script type="module" src="/js/report.js"></script>
 </body>
 </html>
