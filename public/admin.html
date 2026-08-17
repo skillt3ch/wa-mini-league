@@ -95,6 +95,23 @@
 <script type="module">
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+// Reads a fetch response as JSON, but if the body isn't valid JSON (an HTML
+// error page from an unbuilt/broken route, a Cloudflare error page, an
+// empty body, etc.) throws an error that says so instead of surfacing the
+// browser's opaque "unexpected character..." parse error.
+async function readJson(res) {
+  const text = await res.text();
+  let data = null;
+  if (text) {
+    try { data = JSON.parse(text); }
+    catch {
+      throw new Error(`Server returned a non-JSON response (HTTP ${res.status}): ${text.slice(0, 300)}`);
+    }
+  }
+  if (!res.ok) throw new Error(data?.error || `Request failed (HTTP ${res.status}).`);
+  return data;
+}
+
 const PAGE_SIZE = 20;
 
 const loginBox = document.getElementById('loginBox');
@@ -272,13 +289,13 @@ function renderPanel() {
       const msg = card.querySelector('.save-msg');
       const isDraw = sel.value === 'draw';
       const winnerPlayerId = isDraw ? null : Number(sel.value);
-      const res = await fetch(`/api/admin/games/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': getPw() },
-        body: JSON.stringify({ isDraw, winnerPlayerId })
-      });
-      const data = await res.json();
-      if (res.ok) {
+      try {
+        const res = await fetch(`/api/admin/games/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Password': getPw() },
+          body: JSON.stringify({ isDraw, winnerPlayerId })
+        });
+        await readJson(res);
         msg.innerHTML = `<div class="ok name-raw">Saved.</div>`;
         const g = allGames.find(x => x.id === id);
         if (g) {
@@ -288,22 +305,22 @@ function renderPanel() {
           g.outcomeStatus = isDraw ? 'draw' : 'confirmed';
           g.winnerSource = 'manual';
         }
-      } else {
-        msg.innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
+      } catch (ex) {
+        msg.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
       }
     });
     card.querySelector('.delete-btn').addEventListener('click', async () => {
       if (!confirm('Delete this game submission? This cannot be undone.')) return;
-      const res = await fetch(`/api/admin/games/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-Admin-Password': getPw() }
-      });
-      if (res.ok) {
+      try {
+        const res = await fetch(`/api/admin/games/${id}`, {
+          method: 'DELETE',
+          headers: { 'X-Admin-Password': getPw() }
+        });
+        await readJson(res);
         allGames = allGames.filter(x => x.id !== id);
         renderPanel();
-      } else {
-        const data = await res.json();
-        card.querySelector('.save-msg').innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
+      } catch (ex) {
+        card.querySelector('.save-msg').innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
       }
     });
     card.querySelector('.recheck-btn').addEventListener('click', async () => {
@@ -316,8 +333,7 @@ function renderPanel() {
           method: 'POST',
           headers: { 'X-Admin-Password': getPw() }
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Recheck failed.');
+        const data = await readJson(res);
         if (data.changed) {
           msg.innerHTML = `<div class="ok name-raw">WADB recheck updated the result: ${data.isDraw ? 'Draw' : esc(data.winnerName)}.</div>`;
           const g = allGames.find(x => x.id === id);
@@ -395,8 +411,7 @@ async function loadHistory(gameId, container) {
   container.innerHTML = `<div class="hint">Loading history...</div>`;
   try {
     const res = await fetch(`/api/admin/games/${gameId}/history`, { headers: { 'X-Admin-Password': getPw() } });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Could not load history.');
+    const data = await readJson(res);
     container.innerHTML = data.length
       ? data.map(formatHistoryEntry).join('')
       : `<div class="hint">No history yet.</div>`;
