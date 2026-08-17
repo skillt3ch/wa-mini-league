@@ -31,7 +31,7 @@
   <nav class="tab-bar">
     <a href="/">Submit</a>
     <a href="/standings.html" class="active">Standings</a>
-    <a href="/admin.html">Admin</a>
+    <a href="/admin.html" id="adminNavLink" hidden>Admin</a>
   </nav>
 
   <div id="updatedLine" class="updated-line" hidden></div>
@@ -258,9 +258,11 @@ function renderGames() {
       ? `<a class="dl-link" href="${g.wadbUrl}" target="_blank" rel="noopener">verified via WADB &#8599;</a>`
       : g.winnerSource === 'wadb'
         ? `<span class="hint">verified via WADB</span>`
-        : g.winnerSource === 'manual'
-          ? `<span class="hint">set by an admin</span>`
-          : unresolved ? `<span class="hint">awaiting admin review</span>` : '';
+        : g.winnerSource === 'submitter'
+          ? `<span class="hint">self-reported by submitter, not WADB-verified</span>`
+          : g.winnerSource === 'manual'
+            ? `<span class="hint">set by an admin</span>`
+            : unresolved ? `<span class="hint">awaiting admin review</span>` : '';
     const detail = isExpanded ? `
       <div class="game-detail">
         <div class="gd-row"><span>Duration</span><span>${dur(g.durationSeconds)} &middot; ${g.turns} turns</span></div>
@@ -350,5 +352,6 @@ async function load() {
 load();
 </script>
 <script type="module" src="/js/report.js"></script>
+<script type="module" src="/js/adminNav.js"></script>
 </body>
 </html>

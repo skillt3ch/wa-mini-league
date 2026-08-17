@@ -31,7 +31,7 @@
   <nav class="tab-bar">
     <a href="/">Submit</a>
     <a href="/standings.html">Standings</a>
-    <a href="/admin.html" class="active">Admin</a>
+    <a href="/admin.html" id="adminNavLink" class="active" hidden>Admin</a>
   </nav>
 
   <div id="loginBox" class="admin-login">
@@ -40,6 +40,8 @@
     <button class="opt primary" id="loginBtn" style="width:100%">Unlock</button>
     <div id="loginErr"></div>
   </div>
+
+  <button class="opt small" id="logoutBtn" hidden style="margin-bottom:16px;">Log out</button>
 
   <section id="gamesSection" hidden>
     <button class="shead shead-toggle" type="button" id="gamesToggle" aria-expanded="false" aria-controls="gamesBody">
@@ -97,6 +99,8 @@ const PAGE_SIZE = 20;
 
 const loginBox = document.getElementById('loginBox');
 const pwInput = document.getElementById('pw');
+const adminNavLink = document.getElementById('adminNavLink');
+const logoutBtn = document.getElementById('logoutBtn');
 const gamesSection = document.getElementById('gamesSection');
 const panel = document.getElementById('panel');
 const playersSection = document.getElementById('playersSection');
@@ -159,6 +163,8 @@ async function tryUnlock(pw) {
   if (!res.ok) return false;
   setPw(pw);
   loginBox.hidden = true;
+  adminNavLink.hidden = false;
+  logoutBtn.hidden = false;
   gamesSection.hidden = false;
   playersSection.hidden = false;
   reportsSection.hidden = false;
@@ -167,6 +173,14 @@ async function tryUnlock(pw) {
   loadReports();
   return true;
 }
+
+// Clears the stored session password so the Admin tab disappears everywhere
+// in this browser tab — the only way back in is navigating to /admin.html
+// and logging in again.
+logoutBtn.addEventListener('click', () => {
+  sessionStorage.removeItem('wa_admin_pw');
+  location.reload();
+});
 
 document.querySelectorAll('.sort-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -222,10 +236,12 @@ function renderPanel() {
       <div class="top">
         <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
         <span class="meta">
-          ${g.outcomeStatus === 'unresolved' ? '<span class="unresolved-tag">Needs review</span> &middot; ' : ''}
+          ${g.outcomeStatus === 'unresolved'
+            ? '<span class="unresolved-tag">Needs review</span> &middot; '
+            : g.winnerSource === 'submitter' ? '<span class="self-reported-tag">Self-reported</span> &middot; ' : ''}
           added ${g.submittedAt ? new Date(g.submittedAt).toISOString().slice(0,10) : 'unknown'}
           &middot; played ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'unknown'}
-          ${g.winnerSource ? ` &middot; ${g.winnerSource === 'wadb' ? 'verified via WADB' : 'set manually'}` : ''}
+          ${g.winnerSource ? ` &middot; ${g.winnerSource === 'wadb' ? 'verified via WADB' : g.winnerSource === 'submitter' ? 'self-reported by submitter' : 'set manually'}` : ''}
         </span>
       </div>
       ${g.outcomeStatus === 'unresolved' && g.outcomeNote ? `<div class="hint name-raw" style="margin-top:6px;">${esc(g.outcomeNote)}</div>` : ''}

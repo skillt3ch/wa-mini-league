@@ -143,6 +143,7 @@ tr:hover td { background: var(--panel-2); }
 .winner-tag { color: var(--accent-3); }
 .draw-tag { color: var(--fg-dim); }
 .unresolved-tag { color: var(--err); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
+.self-reported-tag { color: var(--fg-bright); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 
 .admin-login { max-width: 400px; margin: 70px auto; text-align: center; }
 .admin-login input {

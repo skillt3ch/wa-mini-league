@@ -31,7 +31,7 @@
   <nav class="tab-bar">
     <a href="/" class="active">Submit</a>
     <a href="/standings.html">Standings</a>
-    <a href="/admin.html">Admin</a>
+    <a href="/admin.html" id="adminNavLink" hidden>Admin</a>
   </nav>
 
   <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a replay file">
@@ -151,24 +151,10 @@ function render() {
       mapping[i].newName = e.target.value;
     });
   });
-  document.getElementById('submitBtn').addEventListener('click', submit);
+  document.getElementById('submitBtn').addEventListener('click', () => submit());
 }
 
-async function submit() {
-  const msg = document.getElementById('submitMsg');
-  msg.innerHTML = '';
-
-  for (let i = 0; i < mapping.length; i++) {
-    if (!mapping[i].playerId && !mapping[i].newName) {
-      msg.innerHTML = `<div class="err name-raw">Map "${esc(players[i].rawName)}" to a player before submitting.</div>`;
-      return;
-    }
-  }
-
-  const submitBtn = document.getElementById('submitBtn');
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Verifying winner & submitting...';
-
+function buildSubmitFormData(manualWinner) {
   const fd = new FormData();
   fd.append('file', currentFile, currentFile.name);
   fd.append('meta', JSON.stringify({
@@ -187,26 +173,82 @@ async function submit() {
     playerId: mapping[i].playerId,
     newPlayerName: mapping[i].newName
   }))));
+  if (manualWinner) fd.append('manualWinner', JSON.stringify(manualWinner));
+  return fd;
+}
+
+// Shown when the server couldn't auto-verify a winner (needsManualWinner).
+// Nothing was saved yet — picking here and resubmitting is what actually
+// records the game, flagged as self-reported for admins to see.
+function renderManualPicker(note) {
+  const msg = document.getElementById('submitMsg');
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.hidden = true;
+
+  msg.innerHTML = `
+    <div class="card">
+      <div class="hint name-raw">Auto-verification couldn't determine a winner${note ? ': ' + esc(note) : ''}. Pick the winner manually so this game can still be recorded — it'll be flagged as self-reported for admins.</div>
+      <div class="row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <select id="manualWinnerSelect" class="name-raw">
+          ${players.map((p, i) => `<option value="${i}">${esc(p.rawName)}</option>`).join('')}
+          <option value="draw">Draw</option>
+        </select>
+        <button class="opt primary" id="manualSubmitBtn">Submit with this result</button>
+      </div>
+    </div>`;
+
+  document.getElementById('manualSubmitBtn').addEventListener('click', () => {
+    const val = document.getElementById('manualWinnerSelect').value;
+    const manualWinner = val === 'draw' ? { isDraw: true, rawIndex: null } : { isDraw: false, rawIndex: Number(val) };
+    submit(manualWinner);
+  });
+}
+
+async function submit(manualWinner) {
+  const msg = document.getElementById('submitMsg');
+  msg.innerHTML = '';
+
+  if (!manualWinner) {
+    for (let i = 0; i < mapping.length; i++) {
+      if (!mapping[i].playerId && !mapping[i].newName) {
+        msg.innerHTML = `<div class="err name-raw">Map "${esc(players[i].rawName)}" to a player before submitting.</div>`;
+        return;
+      }
+    }
+  }
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.hidden = false;
+  submitBtn.disabled = true;
+  submitBtn.textContent = manualWinner ? 'Submitting...' : 'Verifying winner & submitting...';
 
   try {
-    const res = await fetch('/api/submit', { method: 'POST', body: fd });
+    const res = await fetch('/api/submit', { method: 'POST', body: buildSubmitFormData(manualWinner) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Submission failed.');
 
+    if (data.needsManualWinner) {
+      renderManualPicker(data.wadbNote);
+      return;
+    }
+
+    const selfReported = data.winnerSource === 'submitter' ? ' <span class="hint">(self-reported, not WADB-verified)</span>' : '';
     let outcomeLine;
-    if (data.outcomeStatus === 'confirmed') outcomeLine = `Winner: <b class="name-raw">${esc(data.winnerName)}</b>`;
-    else if (data.outcomeStatus === 'draw') outcomeLine = `Result: Draw`;
+    if (data.outcomeStatus === 'confirmed') outcomeLine = `Winner: <b class="name-raw">${esc(data.winnerName)}</b>${selfReported}`;
+    else if (data.outcomeStatus === 'draw') outcomeLine = `Result: Draw${selfReported}`;
     else outcomeLine = `<span class="name-raw">Winner couldn't be auto-verified - an admin will confirm it.</span>`;
 
     msg.innerHTML = `<div class="ok">Submitted. ${outcomeLine} &middot; <a href="/standings.html">View standings &rarr;</a></div>`;
-    submitBtn.textContent = 'Submitted';
+    submitBtn.hidden = true;
   } catch (ex) {
     msg.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
+    submitBtn.hidden = false;
     submitBtn.disabled = false;
     submitBtn.textContent = 'Confirm & submit';
   }
 }
 </script>
 <script type="module" src="/js/report.js"></script>
+<script type="module" src="/js/adminNav.js"></script>
 </body>
 </html>

@@ -12,13 +12,25 @@
 // regardless, we only ever needed the winner. It does mean there's no
 // WADB page to link to, so we don't request/store an id or slug here.
 //
+// Two-pass flow when WADB can't determine a winner: the first request (no
+// manualWinner field) tries WADB; if it comes back unresolved, nothing is
+// persisted yet — the response just says needsManualWinner: true so the
+// client can show a picker. The client then resubmits the *same* file/meta/
+// players plus a manualWinner field; that second pass skips WADB entirely
+// (no point asking twice) and saves with winner_source = 'submitter', which
+// is distinct from 'wadb' (auto-verified) and 'manual' (an admin corrected
+// it later) so these stay visibly flagged as self-reported everywhere.
+//
 // Expected multipart/form-data fields:
-//   file    - the raw .WAgame File
-//   meta    - JSON: { playedAt, mapType, durationSeconds, turns, version }
-//   players - JSON array in team order:
-//               [{ rawName, teamName, colour, shots, turns,
-//                  playerId?: number, newPlayerName?: string }]
-//             exactly one of playerId / newPlayerName must be set per entry
+//   file         - the raw .WAgame File
+//   meta         - JSON: { playedAt, mapType, durationSeconds, turns, version }
+//   players      - JSON array in team order:
+//                    [{ rawName, teamName, colour, shots, turns,
+//                       playerId?: number, newPlayerName?: string }]
+//                  exactly one of playerId / newPlayerName must be set per entry
+//   manualWinner - optional JSON: { isDraw: boolean, rawIndex: number|null }
+//                  rawIndex is an index into the players array above; only
+//                  sent on the resubmit after a needsManualWinner response
 
 import { notifyDiscord, buildGameEmbed } from '../_discord.js';
 
@@ -113,12 +125,13 @@ export async function onRequestPost(context) {
     return Response.json({ error: 'Missing replay file.' }, { status: 400 });
   }
 
-  let meta, players;
+  let meta, players, manualWinner;
   try {
     meta = JSON.parse(form.get('meta') || '{}');
     players = JSON.parse(form.get('players') || '[]');
+    manualWinner = form.get('manualWinner') ? JSON.parse(form.get('manualWinner')) : null;
   } catch {
-    return Response.json({ error: 'Malformed meta/players JSON.' }, { status: 400 });
+    return Response.json({ error: 'Malformed meta/players/manualWinner JSON.' }, { status: 400 });
   }
 
   if (!Array.isArray(players) || players.length < 2) {
@@ -175,14 +188,34 @@ export async function onRequestPost(context) {
     resolvedPlayerIds.push(playerId);
   }
 
-  // Ask WADB who actually won. This never blocks the submission — if it
-  // fails or can't be resolved, the game still gets saved as 'unresolved'
-  // and an admin can set the winner by hand later.
-  const wadbResult = await callWadb(bytes, file.name);
-  let outcome = { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0, note: wadbResult.ok ? null : wadbResult.reason };
-  if (wadbResult.ok) {
-    outcome = resolveOutcome(wadbResult.game, players, resolvedPlayerIds);
+  let outcome;
+  if (manualWinner) {
+    // Resubmit after a needsManualWinner response — WADB already couldn't
+    // resolve this exact replay once, so don't ask it again.
+    if (manualWinner.isDraw) {
+      outcome = { outcomeStatus: 'draw', winnerSource: 'submitter', winnerPlayerId: null, isDraw: 1, note: null };
+    } else {
+      const idx = Number(manualWinner.rawIndex);
+      const winnerPlayerId = resolvedPlayerIds[idx];
+      if (!Number.isInteger(idx) || !winnerPlayerId) {
+        return Response.json({ error: 'Invalid manual winner selection.' }, { status: 400 });
+      }
+      outcome = { outcomeStatus: 'confirmed', winnerSource: 'submitter', winnerPlayerId, isDraw: 0, note: null };
+    }
+  } else {
+    // Ask WADB who actually won. This never blocks the submission — if it
+    // fails or can't be resolved, nothing is saved yet; the response tells
+    // the client to prompt for a manual winner instead.
+    const wadbResult = await callWadb(bytes, file.name);
+    outcome = { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0, note: wadbResult.ok ? null : wadbResult.reason };
+    if (wadbResult.ok) {
+      outcome = resolveOutcome(wadbResult.game, players, resolvedPlayerIds);
+    }
+    if (outcome.outcomeStatus === 'unresolved') {
+      return Response.json({ ok: false, needsManualWinner: true, wadbNote: outcome.note });
+    }
   }
+
   // analyzeReplay is ephemeral — no stored replay or public page on WADB's
   // end — so there's no id/slug to keep. These columns stay populated only
   // for games verified before this change (via the old submitReplay flow).
@@ -235,7 +268,7 @@ export async function onRequestPost(context) {
   context.waitUntil(notifyDiscord(
     env.DISCORD_GAMES_WEBHOOK_URL,
     buildGameEmbed(
-      { players, winnerName, isDraw: outcome.isDraw, outcomeStatus: outcome.outcomeStatus, note: outcome.note },
+      { players, winnerName, isDraw: outcome.isDraw, outcomeStatus: outcome.outcomeStatus, note: outcome.note, winnerSource: outcome.winnerSource },
       new URL(request.url).origin
     )
   ));
@@ -245,6 +278,7 @@ export async function onRequestPost(context) {
     gameId,
     outcomeStatus: outcome.outcomeStatus,
     winnerName,
+    winnerSource: outcome.winnerSource,
     wadbNote: outcome.note
   });
 }
