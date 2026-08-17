@@ -2,6 +2,8 @@
 // (same honour-system philosophy as replay submission), but the reporter's
 // IP is captured server-side and used for a light rate limit so this can't
 // be used to spam the admin panel.
+import { notifyDiscord, buildReportEmbed } from '../_discord.js';
+
 const CATEGORIES = new Set(['player', 'bug', 'other']);
 const MAX_MESSAGE_LEN = 2000;
 const MAX_NAME_LEN = 60;
@@ -34,6 +36,13 @@ export async function onRequestPost(context) {
   await env.DB.prepare(
     `INSERT INTO reports (category, message, reporter_name, ip_address) VALUES (?, ?, ?, ?)`
   ).bind(category, message, reporterName, ip).run();
+
+  // Fire-and-forget: ping the reports Discord channel without delaying the
+  // response to the reporter.
+  context.waitUntil(notifyDiscord(
+    env.DISCORD_REPORTS_WEBHOOK_URL,
+    buildReportEmbed({ category, message, reporterName }, new URL(request.url).origin, env.DISCORD_ADMIN_ROLE_ID)
+  ));
 
   return Response.json({ ok: true });
 }

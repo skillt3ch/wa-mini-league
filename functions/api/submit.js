@@ -13,6 +13,8 @@
 //                  playerId?: number, newPlayerName?: string }]
 //             exactly one of playerId / newPlayerName must be set per entry
 
+import { notifyDiscord, buildGameEmbed } from '../_discord.js';
+
 const WADB_ENDPOINT = 'https://wormsarmageddon.com/api';
 const WADB_QUERY = `
   mutation ($replay: Upload!) {
@@ -211,6 +213,16 @@ export async function onRequestPost(context) {
     const row = await env.DB.prepare(`SELECT name FROM players WHERE id = ?`).bind(outcome.winnerPlayerId).first();
     winnerName = row?.name || null;
   }
+
+  // Fire-and-forget: notify the games Discord channel without delaying the
+  // response to the submitter.
+  context.waitUntil(notifyDiscord(
+    env.DISCORD_GAMES_WEBHOOK_URL,
+    buildGameEmbed(
+      { players, winnerName, isDraw: outcome.isDraw, outcomeStatus: outcome.outcomeStatus },
+      new URL(request.url).origin
+    )
+  ));
 
   return Response.json({
     ok: true,

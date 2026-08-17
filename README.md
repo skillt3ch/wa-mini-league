@@ -20,6 +20,7 @@ Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API
 - Player identity cleanup: the fuzzy matcher on submit is a suggestion, not a guarantee, so duplicates can slip in (e.g. "Stoned-Worm" vs "StonedWorm" both getting created because neither matched confidently). The admin panel's Players section fixes this after the fact — **Merge** reassigns every game, win, and alias from one player onto another and deletes the duplicate; **Delete** removes a player outright, but only once they have zero games attached (merge first if they don't).
 - Text with special/Latin-1 characters (team names, certain player names, and any UI copy with an em dash) is rendered in JetBrains Mono via the `.name-raw` class rather than the DOS bitmap font, since Perfect DOS VGA 437 mis-renders a number of those codepoints.
 - **Issue reports**: the "Report an issue" button (`public/js/report.js`, wired up on every page via `<button id="reportBtn">` in the header) opens a small form — category, message, and an optional name/handle if the reporter wants to identify themselves. It posts to `POST /api/reports`, which is public and requires no login, but captures the submitter's IP (`CF-Connecting-IP`) server-side and caps it at 5 reports per IP per hour to prevent spam. Reports are never shown anywhere public — only the admin panel's Reports section (`GET/PATCH/DELETE /api/admin/reports`) can see or act on them, where they can be marked resolved/reopened or deleted. Open reports are always listed first.
+- **Discord notifications**: `functions/_discord.js` posts to a Discord webhook whenever a game is submitted (`functions/api/submit.js`) or a report is filed (`functions/api/reports.js`) — games and reports go to separate channels/webhooks, and a report also @-mentions an admin role so it doesn't get missed. Both calls are wrapped in `context.waitUntil(...)`, so the notification fires in the background after the response is already sent — a slow or down Discord webhook never delays or breaks a submission. If a webhook secret isn't set, that notification is just silently skipped. See the Discord setup step below.
 
 ## Setup
 
@@ -50,7 +51,18 @@ Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API
    npx wrangler pages secret put ADMIN_PASSWORD
    ```
 
-6. Deploy:
+6. (Optional) Discord notifications — needs a real Discord *server* (incoming webhooks can't post to a group DM). In your server:
+   - Create two channels (e.g. `#game-log` and `#reports`), each with its own webhook: channel settings (or Server Settings → Integrations → Webhooks) → New Webhook → Copy Webhook URL.
+   - If you want issue reports to @-mention a role, enable Developer Mode (User Settings → Advanced) so you can right-click the role and Copy ID.
+   - Set whichever of these you want as secrets — any left unset just means that notification type is silently skipped:
+     ```
+     npx wrangler pages secret put DISCORD_GAMES_WEBHOOK_URL
+     npx wrangler pages secret put DISCORD_REPORTS_WEBHOOK_URL
+     npx wrangler pages secret put DISCORD_ADMIN_ROLE_ID
+     ```
+   - To switch servers/channels later, just overwrite the secret with a new webhook URL (or role ID) — no code changes needed.
+
+7. Deploy:
    ```
    npm run deploy
    ```
