@@ -187,7 +187,23 @@ export function parseWAGame(buf) {
   machines.forEach((m, idx) => { if (m.hasTeam) owners.push(idx); });
   const bySlot = teams.map((t, idx) => idx).sort((a, b) => teams[a].slot - teams[b].slot);
   bySlot.forEach((teamIdx, i) => {
-    if (i < owners.length) teams[teamIdx].machineIdx = owners[i];
+    const t = teams[teamIdx];
+    // A team's `slot` byte is, in practice, a direct index into `machines`
+    // for the machine that owns it — verified against real replays. Prefer
+    // that direct link (gated on the target machine actually being
+    // hasTeam-flagged, as a sanity check) over the hasTeam+appearance-order
+    // pairing below. The direct link survives a spectating/hosting machine
+    // being mis-flagged hasTeam=true (a false positive in the byte-signature
+    // scan above) — that machine's index just won't match any team's slot,
+    // so it's naturally excluded instead of displacing a real player out of
+    // position. Only fall back to order-pairing (which assumes slots are
+    // contiguous 0..n-1, so it's the one that can break after a drop/
+    // reconnect leaves gaps) when the direct link isn't usable.
+    if (machines[t.slot] && machines[t.slot].hasTeam) {
+      t.machineIdx = t.slot;
+    } else if (i < owners.length) {
+      t.machineIdx = owners[i];
+    }
   });
 
   // Event stream — used only for per-team shot/turn counts and overall
