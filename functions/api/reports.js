@@ -4,7 +4,7 @@
 // be used to spam the admin panel.
 import { notifyDiscord, buildReportEmbed } from '../_discord.js';
 
-const CATEGORIES = new Set(['player', 'bug', 'other']);
+const CATEGORIES = new Set(['game_error', 'player', 'bug', 'other']);
 const MAX_MESSAGE_LEN = 2000;
 const MAX_NAME_LEN = 60;
 const RATE_LIMIT_WINDOW_MIN = 60;

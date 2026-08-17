@@ -5,7 +5,10 @@
 
 CREATE TABLE IF NOT EXISTS reports (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  category      TEXT NOT NULL DEFAULT 'other',   -- 'player' | 'bug' | 'other'
+  category      TEXT NOT NULL DEFAULT 'other',   -- 'game_error' | 'player' | 'bug' | 'other'
+                                                  -- (labelled "Game Error" / "Player Behaviour" /
+                                                  -- "Site Issue, Bug or Suggestion" / "Other" in the UI —
+                                                  -- see CATEGORY_LABELS in admin.html and _discord.js)
   message       TEXT NOT NULL,
   reporter_name TEXT,                             -- optional, submitter's own gamer handle/name
   ip_address    TEXT,                             -- captured server-side for abuse prevention only

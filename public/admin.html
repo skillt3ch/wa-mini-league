@@ -112,7 +112,7 @@ let sortMode = 'added'; // 'added' | 'played'
 let gamesPage = 1, playersPage = 1, reportsPage = 1;
 let playersSearch = '';
 
-const CATEGORY_LABELS = { player: 'Player behaviour', bug: 'Site bug', other: 'Other' };
+const CATEGORY_LABELS = { game_error: 'Game Error', player: 'Player Behaviour', bug: 'Site Issue, Bug or Suggestion', other: 'Other' };
 
 function getPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
 function setPw(v) { sessionStorage.setItem('wa_admin_pw', v); }

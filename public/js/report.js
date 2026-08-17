@@ -18,8 +18,9 @@ if (btn) {
       <p class="hint name-raw">A disputed result, someone acting up, a site bug - whatever it is, this goes straight to the admins, nobody else sees it.</p>
       <label class="modal-label">Category
         <select id="reportCategory">
-          <option value="player">Player behaviour</option>
-          <option value="bug">Site bug</option>
+          <option value="game_error">Game Error</option>
+          <option value="player">Player Behaviour</option>
+          <option value="bug">Site Issue, Bug or Suggestion</option>
           <option value="other" selected>Other</option>
         </select>
       </label>

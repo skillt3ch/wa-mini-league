@@ -15,7 +15,7 @@ const COLOUR = {
   magenta: 0xFF66FF
 };
 
-const CATEGORY_LABELS = { player: 'Player behaviour', bug: 'Site bug', other: 'Other' };
+const CATEGORY_LABELS = { game_error: 'Game Error', player: 'Player Behaviour', bug: 'Site Issue, Bug or Suggestion', other: 'Other' };
 
 export async function notifyDiscord(webhookUrl, payload) {
   if (!webhookUrl) return; // not configured for this event type — skip quietly
