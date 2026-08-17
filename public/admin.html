@@ -41,7 +41,10 @@
     <div id="loginErr"></div>
   </div>
 
-  <button class="opt small" id="logoutBtn" hidden style="margin-bottom:16px;">Log out</button>
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+    <button class="opt small" id="logoutBtn" hidden>Log out</button>
+    <span class="hint" id="superAdminBadge" hidden></span>
+  </div>
 
   <section id="gamesSection" hidden>
     <button class="shead shead-toggle" type="button" id="gamesToggle" aria-expanded="false" aria-controls="gamesBody">
@@ -118,6 +121,7 @@ const loginBox = document.getElementById('loginBox');
 const pwInput = document.getElementById('pw');
 const adminNavLink = document.getElementById('adminNavLink');
 const logoutBtn = document.getElementById('logoutBtn');
+const superAdminBadge = document.getElementById('superAdminBadge');
 const gamesSection = document.getElementById('gamesSection');
 const panel = document.getElementById('panel');
 const playersSection = document.getElementById('playersSection');
@@ -178,10 +182,21 @@ async function tryUnlock(pw) {
     body: JSON.stringify({ password: pw })
   });
   if (!res.ok) return false;
+  const data = await res.json().catch(() => ({}));
   setPw(pw);
   loginBox.hidden = true;
   adminNavLink.hidden = false;
   logoutBtn.hidden = false;
+  // Built dynamically rather than left in the page's static markup — a
+  // regular admin's browser never even receives this text, since the
+  // badge only gets filled in for a tab where isSuperAdmin came back true.
+  if (data.isSuperAdmin) {
+    superAdminBadge.innerHTML = `Signed in as <span class="accent-2">Super Admin</span>`;
+    superAdminBadge.hidden = false;
+  } else {
+    superAdminBadge.hidden = true;
+    superAdminBadge.innerHTML = '';
+  }
   gamesSection.hidden = false;
   playersSection.hidden = false;
   reportsSection.hidden = false;
@@ -533,7 +548,7 @@ function renderReports() {
         <span class="meta">
           <span class="name-raw">${r.reporterName ? esc(r.reporterName) : 'anonymous'}</span>
           &middot; ${r.submittedAt ? new Date(r.submittedAt).toISOString().slice(0,10) : 'unknown'}
-          &middot; ip ${esc(r.ipAddress || 'unknown')}
+          ${r.ipAddress ? ` &middot; ip ${esc(r.ipAddress)}` : ''}
         </span>
       </div>
       <p style="white-space:pre-wrap; color:var(--fg-bright); margin:10px 0 0; font-size:15px;">${esc(r.message)}</p>

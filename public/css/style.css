@@ -173,7 +173,7 @@ tr:hover td { background: var(--panel-2); }
 .subtle-hint b { color: var(--fg); font-weight: 400; }
 
 .updated-line { font-size: 13px; color: var(--fg-dim); margin: -14px 0 20px; }
-.updated-line .accent-2 { color: var(--accent-2); }
+.accent-2 { color: var(--accent-2); }
 
 /* ---- filter row: search + date grouping, shared look with .opt ---- */
 .filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
