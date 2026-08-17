@@ -234,12 +234,20 @@ function renderGames() {
   gamesWrap.innerHTML = filtered.map(g => {
     const isExpanded = expanded.has(g.id);
     const unresolved = g.outcomeStatus === 'unresolved';
+    // Only show a tag on the right when there's no single winner to
+    // highlight inline: unresolved needs a flag, a draw has no one to
+    // accent. Otherwise the winner is called out directly in the player
+    // list below instead of being repeated a second time over here.
     const resultTag = unresolved
       ? `<span class="unresolved-tag gr-meta">Needs review</span>`
-      : `<span class="${g.isDraw ? 'draw-tag' : 'winner-tag'} name-raw gr-meta">${g.isDraw ? 'Draw' : esc(g.winnerName)}</span>`;
+      : g.isDraw ? `<span class="draw-tag gr-meta">Draw</span>` : '';
+    const playersHtml = g.players.map(p => {
+      const isWinner = !unresolved && !g.isDraw && p.playerId === g.winnerPlayerId;
+      return isWinner ? `<span class="winner-tag">${esc(p.playerName)}</span>` : esc(p.playerName);
+    }).join(' vs ');
     const row = `
       <button class="game-row fade-in" data-id="${g.id}" aria-expanded="${isExpanded}">
-        <span class="gr-players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
+        <span class="gr-players name-raw">${playersHtml}</span>
         <span class="gr-right">
           ${resultTag}
           <span class="gr-meta">${gameSortMode === 'played' ? fmtDate(g.playedAt) : fmtDate(g.submittedAt)}</span>

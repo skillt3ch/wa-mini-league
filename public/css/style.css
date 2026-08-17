@@ -18,13 +18,13 @@
    See .name-raw below. */
 
 /* --accent-3 is the site's second accent colour (bright CGA magenta),
-   layered on top of theme.css's cyan --accent-2. Deliberately scoped to two
-   things: a game's actual winner (.winner-tag, .wl-badge.w on the
-   standings page) and provenance/reference links (.dl-link — "verified via
-   WADB", "download replay"). Cyan stays reserved for everything else that
-   already used it for emphasis/highlight (ladder rank-1, qualified badge,
-   win streaks, active filter state) — it's about *ranking/aggregate*
-   standing, whereas magenta marks *this specific result*. */
+   layered on top of theme.css's cyan --accent-2. Deliberately scoped to
+   just one thing: a game's actual winner (.winner-tag, .wl-badge.w on the
+   standings page) — so it stays a recognisable "this is the result" signal
+   rather than a second general-purpose highlight. Cyan stays reserved for
+   ranking/aggregate stuff that already used it (ladder rank-1, qualified
+   badge, win streaks, active filter state); .dl-link uses --fg-bright
+   instead of either accent, since a plain reference link isn't a result. */
 :root { --panel-2: #0A0A0A; --err: #FF5555; --accent-3: #FF66FF; }
 
 body { font-size: 18px; min-height: 100vh; padding-bottom: 70px; }
@@ -222,6 +222,11 @@ tr:hover td { background: var(--panel-2); }
 .game-row .gr-players { font-size: 15.5px; }
 .game-row .gr-right { display: flex; align-items: center; gap: 16px; }
 .game-row .gr-meta { font-size: 13px; color: var(--fg-dim); white-space: nowrap; }
+/* .unresolved-tag/.draw-tag double up as .gr-meta for sizing/spacing here,
+   but .game-row .gr-meta's two-class selector otherwise outranks their
+   single-class one and silently wins the color — so it needs its own
+   equal-or-higher-specificity override to actually show red. */
+.game-row .gr-meta.unresolved-tag { color: var(--err); }
 .game-row .gr-caret { color: var(--fg-dim); font-size: 13px; transition: transform .12s; }
 .game-row[aria-expanded="true"] .gr-caret { transform: rotate(90deg); color: var(--accent-2); }
 
@@ -237,8 +242,8 @@ tr:hover td { background: var(--panel-2); }
 }
 .wl-badge.w { color: var(--accent-3); border-color: var(--accent-3); }
 
-.dl-link { color: var(--accent-3); text-decoration: none; border-bottom: 1px dotted var(--accent-3); font-size: 14px; }
-.dl-link:hover { border-bottom-style: solid; filter: brightness(1.3); }
+.dl-link { color: var(--fg-bright); text-decoration: none; border-bottom: 1px dotted var(--border-mid); font-size: 14px; }
+.dl-link:hover { border-bottom-style: solid; color: var(--accent-2); border-color: var(--accent-2); }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fadeIn .25s ease both; }
