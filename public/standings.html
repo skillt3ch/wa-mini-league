@@ -305,6 +305,26 @@ document.querySelectorAll('.game-sort-btn').forEach(btn => {
   });
 });
 
+let lastUpdatedAt = null;
+
+function relativeTime(date) {
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+// Re-renders just the relative text, not the underlying data - this page
+// only fetches once per load, so this is what keeps "Last updated" honest
+// if the tab is left open a while instead of silently going stale.
+function renderUpdatedLine() {
+  if (!lastUpdatedAt) return;
+  updatedLine.innerHTML = `Last updated <span class="accent-2" title="${esc(lastUpdatedAt.toLocaleString())}">${relativeTime(lastUpdatedAt)}</span>`;
+}
+setInterval(renderUpdatedLine, 30000);
+
 async function load() {
   try {
     const [standingsRes, gamesRes] = await Promise.all([
@@ -316,7 +336,8 @@ async function load() {
     streaks = computeStreaks(games);
     renderLadder();
     renderGames();
-    updatedLine.innerHTML = `Last updated <span class="accent-2">${new Date().toLocaleTimeString()}</span>`;
+    lastUpdatedAt = new Date();
+    renderUpdatedLine();
     updatedLine.hidden = false;
   } catch (ex) {
     ladderWrap.innerHTML = `<div class="err name-raw">Could not load standings.</div>`;
