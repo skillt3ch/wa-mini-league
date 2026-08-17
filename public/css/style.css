@@ -67,6 +67,21 @@ section { margin-top: 36px; }
 }
 .shead .rule { flex: 1; height: 1px; background: var(--border-dim); }
 
+/* ---- collapsible section headers (admin page: Games/Reports/Players) ---- */
+.shead-toggle {
+  cursor: pointer; user-select: none; background: none; border: none;
+  width: 100%; padding: 0; font: inherit; color: inherit;
+}
+.shead-toggle:hover h2 { color: var(--fg-bright); }
+.shead-toggle .chev { color: var(--fg-dim); font-size: 13px; transition: transform .12s; }
+.shead-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.count-badge { font-size: 13px; color: var(--fg-dim); font-weight: 400; }
+.collapsible-body { margin-top: 16px; }
+
+/* ---- pager (Games/Reports/Players lists) ---- */
+.pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 18px; }
+.pager-label { font-size: 13px; color: var(--fg-dim); }
+
 /* ---- dropzone (matches the Extract/Create tab dropzone styling) ---- */
 .drop {
   border: 1px dashed var(--border-mid); background: var(--panel-2);

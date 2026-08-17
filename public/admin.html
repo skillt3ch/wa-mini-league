@@ -41,48 +41,114 @@
     <div id="loginErr"></div>
   </div>
 
-  <div id="sortRow" class="filter-row" hidden>
-    <div class="filter-btns">
-      <button class="opt small sort-btn" data-sort="added" aria-pressed="true">Date added</button>
-      <button class="opt small sort-btn" data-sort="played" aria-pressed="false">Date played</button>
+  <section id="gamesSection" hidden>
+    <button class="shead shead-toggle" type="button" id="gamesToggle" aria-expanded="false" aria-controls="gamesBody">
+      <span class="chev">&#9656;</span>
+      <h2>Games</h2>
+      <span class="count-badge" id="gamesCount"></span>
+      <div class="rule"></div>
+    </button>
+    <div id="gamesBody" class="collapsible-body" hidden>
+      <div id="sortRow" class="filter-row">
+        <div class="filter-btns">
+          <button class="opt small sort-btn" data-sort="added" aria-pressed="true">Date added</button>
+          <button class="opt small sort-btn" data-sort="played" aria-pressed="false">Date played</button>
+        </div>
+      </div>
+      <main id="panel"></main>
+      <div class="pager" id="gamesPager"></div>
     </div>
-  </div>
-  <main id="panel" hidden></main>
+  </section>
 
   <section id="reportsSection" hidden>
-    <div class="shead"><h2>Reports</h2><div class="rule"></div></div>
-    <p class="hint">Submitted via the "Report an issue" button on any page. Open ones are shown first.</p>
-    <main id="reportsPanel"></main>
+    <button class="shead shead-toggle" type="button" id="reportsToggle" aria-expanded="false" aria-controls="reportsBody">
+      <span class="chev">&#9656;</span>
+      <h2>Reports</h2>
+      <span class="count-badge" id="reportsCount"></span>
+      <div class="rule"></div>
+    </button>
+    <div id="reportsBody" class="collapsible-body" hidden>
+      <p class="hint">Submitted via the "Report an issue" button on any page. Open ones are shown first.</p>
+      <main id="reportsPanel"></main>
+      <div class="pager" id="reportsPager"></div>
+    </div>
   </section>
 
   <section id="playersSection" hidden>
-    <div class="shead"><h2>Players</h2><div class="rule"></div></div>
-    <p class="hint">Merge duplicate names (e.g. a rename that didn't get matched), or delete a player outright once they have no games left.</p>
-    <main id="playersPanel"></main>
+    <button class="shead shead-toggle" type="button" id="playersToggle" aria-expanded="false" aria-controls="playersBody">
+      <span class="chev">&#9656;</span>
+      <h2>Players</h2>
+      <span class="count-badge" id="playersCount"></span>
+      <div class="rule"></div>
+    </button>
+    <div id="playersBody" class="collapsible-body" hidden>
+      <p class="hint">Merge duplicate names (e.g. a rename that didn't get matched), or delete a player outright once they have no games left.</p>
+      <input type="text" id="playerSearch" class="search-input" placeholder="Search players or aliases...">
+      <main id="playersPanel"></main>
+      <div class="pager" id="playersPager"></div>
+    </div>
   </section>
 </div>
 
 <script type="module">
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+const PAGE_SIZE = 20;
+
 const loginBox = document.getElementById('loginBox');
-const panel = document.getElementById('panel');
 const pwInput = document.getElementById('pw');
-const sortRow = document.getElementById('sortRow');
+const gamesSection = document.getElementById('gamesSection');
+const panel = document.getElementById('panel');
 const playersSection = document.getElementById('playersSection');
 const playersPanel = document.getElementById('playersPanel');
 const reportsSection = document.getElementById('reportsSection');
 const reportsPanel = document.getElementById('reportsPanel');
+const playerSearchInput = document.getElementById('playerSearch');
 
 let allGames = [];
 let allPlayers = [];
 let allReports = [];
 let sortMode = 'added'; // 'added' | 'played'
+let gamesPage = 1, playersPage = 1, reportsPage = 1;
+let playersSearch = '';
 
 const CATEGORY_LABELS = { player: 'Player behaviour', bug: 'Site bug', other: 'Other' };
 
 function getPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
 function setPw(v) { sessionStorage.setItem('wa_admin_pw', v); }
+
+// ---- collapsible sections ----
+function wireCollapsible(toggleId, bodyId) {
+  const toggle = document.getElementById(toggleId);
+  const body = document.getElementById(bodyId);
+  toggle.addEventListener('click', () => {
+    const willOpen = body.hidden;
+    body.hidden = !willOpen;
+    toggle.setAttribute('aria-expanded', String(willOpen));
+  });
+}
+wireCollapsible('gamesToggle', 'gamesBody');
+wireCollapsible('reportsToggle', 'reportsBody');
+wireCollapsible('playersToggle', 'playersBody');
+
+// ---- pagination helper, shared by all three lists ----
+function paginate(items, page) {
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const clamped = Math.min(Math.max(1, page), totalPages);
+  const start = (clamped - 1) * PAGE_SIZE;
+  return { pageItems: items.slice(start, start + PAGE_SIZE), page: clamped, totalPages };
+}
+function renderPager(containerId, page, totalPages, onChange) {
+  const el = document.getElementById(containerId);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button class="opt small pager-prev" ${page <= 1 ? 'disabled' : ''}>&laquo; Prev</button>
+    <span class="pager-label">Page ${page} of ${totalPages}</span>
+    <button class="opt small pager-next" ${page >= totalPages ? 'disabled' : ''}>Next &raquo;</button>
+  `;
+  if (page > 1) el.querySelector('.pager-prev').addEventListener('click', () => onChange(page - 1));
+  if (page < totalPages) el.querySelector('.pager-next').addEventListener('click', () => onChange(page + 1));
+}
 
 async function tryUnlock(pw) {
   const res = await fetch('/api/admin/verify', {
@@ -93,8 +159,7 @@ async function tryUnlock(pw) {
   if (!res.ok) return false;
   setPw(pw);
   loginBox.hidden = true;
-  panel.hidden = false;
-  sortRow.hidden = false;
+  gamesSection.hidden = false;
   playersSection.hidden = false;
   reportsSection.hidden = false;
   loadPanel();
@@ -108,6 +173,7 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
     sortMode = btn.dataset.sort;
     document.querySelectorAll('.sort-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
     btn.setAttribute('aria-pressed', 'true');
+    gamesPage = 1;
     renderPanel();
   });
 });
@@ -118,6 +184,12 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 });
 pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginBtn').click(); });
 
+playerSearchInput.addEventListener('input', e => {
+  playersSearch = e.target.value;
+  playersPage = 1;
+  renderPlayers();
+});
+
 // If a password is already stored in this browser tab's session, try it silently.
 if (getPw()) tryUnlock(getPw());
 
@@ -127,7 +199,8 @@ async function loadPanel() {
 }
 
 function renderPanel() {
-  if (!allGames.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; return; }
+  document.getElementById('gamesCount').textContent = `(${allGames.length})`;
+  if (!allGames.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; document.getElementById('gamesPager').innerHTML = ''; return; }
 
   // Unresolved games (WADB couldn't determine a winner) need attention —
   // surface them first regardless of sort mode. Within each group, sort by
@@ -141,7 +214,10 @@ function renderPanel() {
     return new Date(bDate) - new Date(aDate);
   });
 
-  panel.innerHTML = sorted.map(g => `
+  const { pageItems, page, totalPages } = paginate(sorted, gamesPage);
+  gamesPage = page;
+
+  panel.innerHTML = pageItems.map(g => `
     <div class="gamecard" data-id="${g.id}">
       <div class="top">
         <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
@@ -167,6 +243,8 @@ function renderPanel() {
       <div class="save-msg"></div>
     </div>
   `).join('');
+
+  renderPager('gamesPager', page, totalPages, p => { gamesPage = p; renderPanel(); });
 
   panel.querySelectorAll('.gamecard').forEach(card => {
     const id = Number(card.dataset.id);
@@ -202,8 +280,8 @@ function renderPanel() {
         headers: { 'X-Admin-Password': getPw() }
       });
       if (res.ok) {
-        card.remove();
         allGames = allGames.filter(x => x.id !== id);
+        renderPanel();
       } else {
         const data = await res.json();
         card.querySelector('.save-msg').innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
@@ -219,9 +297,24 @@ async function loadPlayers() {
 }
 
 function renderPlayers() {
-  if (!allPlayers.length) { playersPanel.innerHTML = `<div class="hint">No players yet.</div>`; return; }
+  document.getElementById('playersCount').textContent = `(${allPlayers.length})`;
+  if (!allPlayers.length) { playersPanel.innerHTML = `<div class="hint">No players yet.</div>`; document.getElementById('playersPager').innerHTML = ''; return; }
 
-  playersPanel.innerHTML = allPlayers.map(p => `
+  const term = playersSearch.trim().toLowerCase();
+  const filtered = term
+    ? allPlayers.filter(p => p.name.toLowerCase().includes(term) || p.aliases.some(a => a.toLowerCase().includes(term)))
+    : allPlayers;
+
+  if (!filtered.length) {
+    playersPanel.innerHTML = `<div class="hint">No players match "${esc(playersSearch)}".</div>`;
+    document.getElementById('playersPager').innerHTML = '';
+    return;
+  }
+
+  const { pageItems, page, totalPages } = paginate(filtered, playersPage);
+  playersPage = page;
+
+  playersPanel.innerHTML = pageItems.map(p => `
     <div class="gamecard" data-id="${p.playerId}">
       <div class="top">
         <span class="players name-raw">${esc(p.name)}</span>
@@ -241,6 +334,8 @@ function renderPlayers() {
       <div class="save-msg"></div>
     </div>
   `).join('');
+
+  renderPager('playersPager', page, totalPages, p => { playersPage = p; renderPlayers(); });
 
   playersPanel.querySelectorAll('.gamecard').forEach(card => {
     const id = Number(card.dataset.id);
@@ -292,9 +387,13 @@ async function loadReports() {
 }
 
 function renderReports() {
-  if (!allReports.length) { reportsPanel.innerHTML = `<div class="hint">No reports yet.</div>`; return; }
+  document.getElementById('reportsCount').textContent = `(${allReports.length})`;
+  if (!allReports.length) { reportsPanel.innerHTML = `<div class="hint">No reports yet.</div>`; document.getElementById('reportsPager').innerHTML = ''; return; }
 
-  reportsPanel.innerHTML = allReports.map(r => `
+  const { pageItems, page, totalPages } = paginate(allReports, reportsPage);
+  reportsPage = page;
+
+  reportsPanel.innerHTML = pageItems.map(r => `
     <div class="gamecard" data-id="${r.id}">
       <div class="top">
         <span class="players">
@@ -315,6 +414,8 @@ function renderReports() {
       <div class="save-msg"></div>
     </div>
   `).join('');
+
+  renderPager('reportsPager', page, totalPages, p => { reportsPage = p; renderReports(); });
 
   reportsPanel.querySelectorAll('.gamecard').forEach(card => {
     const id = Number(card.dataset.id);
