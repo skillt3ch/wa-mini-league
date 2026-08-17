@@ -30,7 +30,7 @@ export async function notifyDiscord(webhookUrl, payload) {
   }
 }
 
-// game: { players: [{ rawName }], winnerName, isDraw, outcomeStatus }
+// game: { players: [{ rawName }], winnerName, isDraw, outcomeStatus, note }
 export function buildGameEmbed(game, origin) {
   const playersStr = game.players.map(p => p.rawName).join(' vs ');
   const unresolved = game.outcomeStatus === 'unresolved';
@@ -38,14 +38,17 @@ export function buildGameEmbed(game, origin) {
     ? 'Needs review — WADB could not verify a winner'
     : game.isDraw ? 'Draw' : game.winnerName;
 
+  const fields = [
+    { name: 'Players', value: playersStr || 'unknown' },
+    { name: 'Result', value: resultLabel || 'unknown' }
+  ];
+  if (unresolved && game.note) fields.push({ name: 'Why', value: game.note });
+
   return {
     embeds: [{
       title: 'New game submitted',
       color: unresolved ? COLOUR.red : COLOUR.cyan,
-      fields: [
-        { name: 'Players', value: playersStr || 'unknown' },
-        { name: 'Result', value: resultLabel || 'unknown' }
-      ],
+      fields,
       url: `${origin}/standings.html`,
       timestamp: new Date().toISOString()
     }]

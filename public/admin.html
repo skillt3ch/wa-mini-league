@@ -152,6 +152,7 @@ function renderPanel() {
           ${g.winnerSource ? ` &middot; ${g.winnerSource === 'wadb' ? 'verified via WADB' : 'set manually'}` : ''}
         </span>
       </div>
+      ${g.outcomeStatus === 'unresolved' && g.outcomeNote ? `<div class="hint name-raw" style="margin-top:6px;">${esc(g.outcomeNote)}</div>` : ''}
       <div class="row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <select class="winner-select name-raw">
           <option value="" ${g.outcomeStatus === 'unresolved' ? 'selected' : ''} disabled>-- choose winner --</option>

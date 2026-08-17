@@ -63,25 +63,34 @@ async function callWadb(bytes, filename) {
 // case-insensitively.
 function resolveOutcome(wadbGame, players, resolvedPlayerIds) {
   if (!wadbGame.matchComplete) {
-    return { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0 };
+    return {
+      outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0,
+      note: 'WADB reported the match as not complete (aborted or interrupted game).'
+    };
   }
 
   const winners = (wadbGame.teams || []).filter(t => t.won === true);
 
   if (winners.length === 0) {
-    return { outcomeStatus: 'draw', winnerSource: 'wadb', winnerPlayerId: null, isDraw: 1 };
+    return { outcomeStatus: 'draw', winnerSource: 'wadb', winnerPlayerId: null, isDraw: 1, note: null };
   }
 
   if (winners.length === 1) {
     const idx = players.findIndex(p => (p.colour || '').toUpperCase() === (winners[0].color || '').toUpperCase());
     if (idx !== -1) {
-      return { outcomeStatus: 'confirmed', winnerSource: 'wadb', winnerPlayerId: resolvedPlayerIds[idx], isDraw: 0 };
+      return { outcomeStatus: 'confirmed', winnerSource: 'wadb', winnerPlayerId: resolvedPlayerIds[idx], isDraw: 0, note: null };
     }
+    return {
+      outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0,
+      note: `WADB reported the winning colour as "${winners[0].color}", but no submitted player was mapped to that colour.`
+    };
   }
 
-  // Multiple winners (alliance mode) or a colour WADB reported that we
-  // don't have a matching player for — don't guess, flag for an admin.
-  return { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0 };
+  // Multiple winners — alliance mode, most likely.
+  return {
+    outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0,
+    note: `WADB reported ${winners.length} winning teams (likely alliance mode) — can't auto-assign a single winner.`
+  };
 }
 
 export async function onRequestPost(context) {
@@ -165,7 +174,7 @@ export async function onRequestPost(context) {
   // fails or can't be resolved, the game still gets saved as 'unresolved'
   // and an admin can set the winner by hand later.
   const wadbResult = await callWadb(bytes, file.name);
-  let outcome = { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0 };
+  let outcome = { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0, note: wadbResult.ok ? null : wadbResult.reason };
   let wadbSlug = null, wadbGameId = null;
   if (wadbResult.ok) {
     outcome = resolveOutcome(wadbResult.game, players, resolvedPlayerIds);
@@ -180,8 +189,8 @@ export async function onRequestPost(context) {
     INSERT INTO games
       (played_at, map_type, duration_s, turns, replay_version,
        winner_player_id, is_draw, replay_r2_key, replay_filename, replay_hash,
-       outcome_status, winner_source, wadb_slug, wadb_game_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       outcome_status, winner_source, wadb_slug, wadb_game_id, outcome_note)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     meta.playedAt || null,
     meta.mapType ?? null,
@@ -196,7 +205,8 @@ export async function onRequestPost(context) {
     outcome.outcomeStatus,
     outcome.winnerSource,
     wadbSlug,
-    wadbGameId
+    wadbGameId,
+    outcome.note || null
   ).run();
   const gameId = gameRes.meta.last_row_id;
 
@@ -219,7 +229,7 @@ export async function onRequestPost(context) {
   context.waitUntil(notifyDiscord(
     env.DISCORD_GAMES_WEBHOOK_URL,
     buildGameEmbed(
-      { players, winnerName, isDraw: outcome.isDraw, outcomeStatus: outcome.outcomeStatus },
+      { players, winnerName, isDraw: outcome.isDraw, outcomeStatus: outcome.outcomeStatus, note: outcome.note },
       new URL(request.url).origin
     )
   ));
@@ -229,6 +239,6 @@ export async function onRequestPost(context) {
     gameId,
     outcomeStatus: outcome.outcomeStatus,
     winnerName,
-    wadbNote: wadbResult.ok ? null : wadbResult.reason
+    wadbNote: outcome.note
   });
 }
