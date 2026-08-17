@@ -1,4 +1,9 @@
 import { isAdmin, unauthorized } from '../../../_authAdmin.js';
+import { logGameAudit } from '../../../_gameAudit.js';
+
+function adminIp(request) {
+  return request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || 'unknown';
+}
 
 // PATCH /api/admin/games/:id — edit winner / draw flag for a submission.
 // Body: { winnerPlayerId: number|null, isDraw: boolean }
@@ -10,7 +15,9 @@ export async function onRequestPatch(context) {
   let body;
   try { body = await request.json(); } catch { body = {}; }
 
-  const game = await env.DB.prepare(`SELECT id FROM games WHERE id = ?`).bind(id).first();
+  const game = await env.DB.prepare(
+    `SELECT id, winner_player_id, is_draw, outcome_status, winner_source FROM games WHERE id = ?`
+  ).bind(id).first();
   if (!game) return Response.json({ error: 'Game not found.' }, { status: 404 });
 
   const isDraw = !!body.isDraw;
@@ -35,11 +42,24 @@ export async function onRequestPatch(context) {
     `UPDATE games SET winner_player_id = ?, is_draw = ?, outcome_status = ?, winner_source = 'manual' WHERE id = ?`
   ).bind(winnerPlayerId, isDraw ? 1 : 0, outcomeStatus, id).run();
 
+  // Every admin edit is logged — before/after values plus the admin's IP —
+  // so nothing about a game's result can change without a visible trail.
+  await logGameAudit(env, {
+    gameId: id,
+    action: 'winner_edit',
+    actor: 'admin',
+    adminIp: adminIp(request),
+    before: { winnerSource: game.winner_source, winnerPlayerId: game.winner_player_id, isDraw: !!game.is_draw, outcomeStatus: game.outcome_status },
+    after: { winnerSource: 'manual', winnerPlayerId, isDraw, outcomeStatus }
+  });
+
   return Response.json({ ok: true });
 }
 
 // DELETE /api/admin/games/:id — remove a submission entirely (and its
-// stored replay file). game_players rows cascade via the FK.
+// stored replay file). game_players and game_audit_log rows both cascade
+// via their FK — there's no separate "deletion" audit entry, since once
+// the game is gone there's nothing left to view a trail against.
 export async function onRequestDelete(context) {
   const { env, request, params } = context;
   if (!isAdmin(request, env)) return unauthorized();

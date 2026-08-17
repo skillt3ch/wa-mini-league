@@ -252,11 +252,14 @@ function renderPanel() {
           <option value="draw" ${g.isDraw ? 'selected' : ''}>Draw</option>
         </select>
         <button class="opt save-btn">Save</button>
+        <button class="opt recheck-btn">Re-check WADB</button>
         <button class="opt danger delete-btn">Delete</button>
         ${g.wadbUrl ? `<a class="dl-link" href="${g.wadbUrl}" target="_blank" rel="noopener">WADB &#8599;</a>` : ''}
         <a class="dl-link" href="${g.replayDownloadUrl}" style="margin-left:auto;">download replay</a>
       </div>
       <div class="save-msg"></div>
+      <button class="opt small history-toggle-btn" type="button" aria-expanded="false" style="margin-top:8px;">History</button>
+      <div class="history-body" hidden></div>
     </div>
   `).join('');
 
@@ -303,7 +306,103 @@ function renderPanel() {
         card.querySelector('.save-msg').innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
       }
     });
+    card.querySelector('.recheck-btn').addEventListener('click', async () => {
+      const btn = card.querySelector('.recheck-btn');
+      const msg = card.querySelector('.save-msg');
+      btn.disabled = true;
+      btn.textContent = 'Rechecking...';
+      try {
+        const res = await fetch(`/api/admin/games/${id}/recheck`, {
+          method: 'POST',
+          headers: { 'X-Admin-Password': getPw() }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Recheck failed.');
+        if (data.changed) {
+          msg.innerHTML = `<div class="ok name-raw">WADB recheck updated the result: ${data.isDraw ? 'Draw' : esc(data.winnerName)}.</div>`;
+          const g = allGames.find(x => x.id === id);
+          if (g) {
+            g.isDraw = data.isDraw;
+            g.winnerPlayerId = data.winnerPlayerId;
+            g.winnerName = data.winnerName;
+            g.outcomeStatus = data.outcomeStatus;
+            g.winnerSource = data.winnerSource;
+            g.outcomeNote = null;
+          }
+          renderPanel();
+        } else {
+          msg.innerHTML = `<div class="hint name-raw">Recheck made no change${data.note ? ': ' + esc(data.note) : '.'}</div>`;
+        }
+        // History may now be stale/open — refresh it if it's expanded.
+        const historyBody = card.querySelector('.history-body');
+        if (historyBody && !historyBody.hidden) loadHistory(id, historyBody);
+      } catch (ex) {
+        msg.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Re-check WADB';
+      }
+    });
+    card.querySelector('.history-toggle-btn').addEventListener('click', () => {
+      const btn = card.querySelector('.history-toggle-btn');
+      const body = card.querySelector('.history-body');
+      const willOpen = body.hidden;
+      body.hidden = !willOpen;
+      btn.setAttribute('aria-expanded', String(willOpen));
+      if (willOpen) loadHistory(id, body);
+    });
   });
+}
+
+function historyStateLabel(state) {
+  if (!state || !state.outcomeStatus) return 'unresolved';
+  if (state.outcomeStatus === 'unresolved') return 'unresolved';
+  if (state.isDraw) return 'Draw';
+  return state.winnerName || 'unknown player';
+}
+
+const HISTORY_SOURCE_LABELS = { wadb: 'verified via WADB', submitter: 'self-reported by submitter', manual: 'set by an admin' };
+
+function formatHistoryEntry(entry) {
+  const when = new Date(entry.createdAt.replace(' ', 'T') + 'Z').toLocaleString();
+  const ipTag = entry.adminIp ? ` &middot; <span class="name-raw">IP ${esc(entry.adminIp)}</span>` : '';
+
+  let headline;
+  if (entry.action === 'submitted') {
+    const sourceLabel = HISTORY_SOURCE_LABELS[entry.new.winnerSource] || '';
+    headline = `Submitted — ${historyStateLabel(entry.new)}${sourceLabel ? ` (${sourceLabel})` : ''}`;
+  } else if (entry.action === 'winner_edit') {
+    headline = `Admin changed the result: ${historyStateLabel(entry.old)} &rarr; ${historyStateLabel(entry.new)}`;
+  } else if (entry.action === 'wadb_recheck') {
+    const changed = entry.old.winnerSource !== entry.new.winnerSource
+      || entry.old.winnerName !== entry.new.winnerName
+      || entry.old.isDraw !== entry.new.isDraw
+      || entry.old.outcomeStatus !== entry.new.outcomeStatus;
+    headline = changed
+      ? `Admin re-checked WADB — updated: ${historyStateLabel(entry.old)} &rarr; ${historyStateLabel(entry.new)}`
+      : `Admin re-checked WADB — no change (${historyStateLabel(entry.new)})`;
+  } else {
+    headline = entry.action;
+  }
+
+  return `<div class="history-entry">
+    <div class="name-raw">${headline}${ipTag}</div>
+    <div class="hint">${esc(when)}${entry.note ? ` &middot; ${esc(entry.note)}` : ''}</div>
+  </div>`;
+}
+
+async function loadHistory(gameId, container) {
+  container.innerHTML = `<div class="hint">Loading history...</div>`;
+  try {
+    const res = await fetch(`/api/admin/games/${gameId}/history`, { headers: { 'X-Admin-Password': getPw() } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not load history.');
+    container.innerHTML = data.length
+      ? data.map(formatHistoryEntry).join('')
+      : `<div class="hint">No history yet.</div>`;
+  } catch (ex) {
+    container.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
+  }
 }
 
 async function loadPlayers() {

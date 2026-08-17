@@ -145,6 +145,12 @@ tr:hover td { background: var(--panel-2); }
 .unresolved-tag { color: var(--err); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .self-reported-tag { color: var(--fg-bright); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 
+.history-toggle-btn { opacity: .75; }
+.history-body { margin-top: 10px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border-dim); }
+.history-entry { padding: 6px 0; border-bottom: 1px solid var(--border-dim); font-size: 13.5px; }
+.history-entry:last-child { border-bottom: none; }
+.history-entry .hint { margin-top: 2px; }
+
 .admin-login { max-width: 400px; margin: 70px auto; text-align: center; }
 .admin-login input {
   width: 100%; padding: 12px; margin: 12px 0; background: var(--panel-2);

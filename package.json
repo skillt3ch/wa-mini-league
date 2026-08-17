@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "wrangler pages dev public --d1=DB --r2=REPLAYS",
     "deploy": "wrangler pages deploy public",
-    "db:migrate:local": "wrangler d1 execute wa-mini-league-db --local --file=migrations/0001_init.sql && wrangler d1 execute wa-mini-league-db --local --file=migrations/0002_wadb_outcome.sql && wrangler d1 execute wa-mini-league-db --local --file=migrations/0003_reports.sql && wrangler d1 execute wa-mini-league-db --local --file=migrations/0004_outcome_note.sql",
-    "db:migrate:remote": "wrangler d1 execute wa-mini-league-db --remote --file=migrations/0001_init.sql && wrangler d1 execute wa-mini-league-db --remote --file=migrations/0002_wadb_outcome.sql && wrangler d1 execute wa-mini-league-db --remote --file=migrations/0003_reports.sql && wrangler d1 execute wa-mini-league-db --remote --file=migrations/0004_outcome_note.sql"
+    "db:migrate:local": "wrangler d1 execute wa-mini-league-db --local --file=migrations/0001_init.sql && wrangler d1 execute wa-mini-league-db --local --file=migrations/0002_wadb_outcome.sql && wrangler d1 execute wa-mini-league-db --local --file=migrations/0003_reports.sql && wrangler d1 execute wa-mini-league-db --local --file=migrations/0004_outcome_note.sql && wrangler d1 execute wa-mini-league-db --local --file=migrations/0005_audit_log.sql",
+    "db:migrate:remote": "wrangler d1 execute wa-mini-league-db --remote --file=migrations/0001_init.sql && wrangler d1 execute wa-mini-league-db --remote --file=migrations/0002_wadb_outcome.sql && wrangler d1 execute wa-mini-league-db --remote --file=migrations/0003_reports.sql && wrangler d1 execute wa-mini-league-db --remote --file=migrations/0004_outcome_note.sql && wrangler d1 execute wa-mini-league-db --remote --file=migrations/0005_audit_log.sql"
   },
   "devDependencies": {
     "wrangler": "^4.120.1"
