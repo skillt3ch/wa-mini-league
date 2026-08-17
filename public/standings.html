@@ -256,9 +256,11 @@ function renderGames() {
       </button>`;
     const provenance = g.wadbUrl
       ? `<a class="dl-link" href="${g.wadbUrl}" target="_blank" rel="noopener">verified via WADB &#8599;</a>`
-      : g.winnerSource === 'manual'
-        ? `<span class="hint">set by an admin</span>`
-        : unresolved ? `<span class="hint">awaiting admin review</span>` : '';
+      : g.winnerSource === 'wadb'
+        ? `<span class="hint">verified via WADB</span>`
+        : g.winnerSource === 'manual'
+          ? `<span class="hint">set by an admin</span>`
+          : unresolved ? `<span class="hint">awaiting admin review</span>` : '';
     const detail = isExpanded ? `
       <div class="game-detail">
         <div class="gd-row"><span>Duration</span><span>${dur(g.durationSeconds)} &middot; ${g.turns} turns</span></div>

@@ -5,6 +5,13 @@
 // engine and returns a real winner rather than a guess. See outcome
 // resolution below for what happens when that can't be determined.
 //
+// Uses WADB's `analyzeReplay` mutation, not `submitReplay` — it runs the
+// same engine analysis but is public/unauthenticated and doesn't persist
+// anything on WADB's end (no stored replay, no public game page). That's
+// fine for us: we already store our own copy of the replay in R2
+// regardless, we only ever needed the winner. It does mean there's no
+// WADB page to link to, so we don't request/store an id or slug here.
+//
 // Expected multipart/form-data fields:
 //   file    - the raw .WAgame File
 //   meta    - JSON: { playedAt, mapType, durationSeconds, turns, version }
@@ -18,9 +25,7 @@ import { notifyDiscord, buildGameEmbed } from '../_discord.js';
 const WADB_ENDPOINT = 'https://wormsarmageddon.com/api';
 const WADB_QUERY = `
   mutation ($replay: Upload!) {
-    submitReplay(replay: $replay) {
-      id
-      slug
+    analyzeReplay(replay: $replay) {
       matchComplete
       winningAllianceColor
       teams { name color won }
@@ -33,7 +38,7 @@ async function sha256Hex(buf) {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Calls the WADB submitReplay mutation. Returns { ok: true, game } on a
+// Calls the WADB analyzeReplay mutation. Returns { ok: true, game } on a
 // clean GraphQL response, or { ok: false, reason } if the call failed or
 // returned GraphQL errors — callers treat that as "couldn't verify",
 // not as a reason to reject the submission outright.
@@ -49,9 +54,9 @@ async function callWadb(bytes, filename) {
 
     const json = await res.json();
     if (json.errors?.length) return { ok: false, reason: json.errors[0]?.message || 'WADB reported an error' };
-    if (!json.data?.submitReplay) return { ok: false, reason: 'WADB returned no game data' };
+    if (!json.data?.analyzeReplay) return { ok: false, reason: 'WADB returned no game data' };
 
-    return { ok: true, game: json.data.submitReplay };
+    return { ok: true, game: json.data.analyzeReplay };
   } catch (err) {
     return { ok: false, reason: 'Could not reach WADB: ' + (err?.message || err) };
   }
@@ -175,12 +180,13 @@ export async function onRequestPost(context) {
   // and an admin can set the winner by hand later.
   const wadbResult = await callWadb(bytes, file.name);
   let outcome = { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0, note: wadbResult.ok ? null : wadbResult.reason };
-  let wadbSlug = null, wadbGameId = null;
   if (wadbResult.ok) {
     outcome = resolveOutcome(wadbResult.game, players, resolvedPlayerIds);
-    wadbSlug = wadbResult.game.slug || null;
-    wadbGameId = wadbResult.game.id || null;
   }
+  // analyzeReplay is ephemeral — no stored replay or public page on WADB's
+  // end — so there's no id/slug to keep. These columns stay populated only
+  // for games verified before this change (via the old submitReplay flow).
+  const wadbSlug = null, wadbGameId = null;
 
   const r2Key = `replays/${hash}.WAgame`;
   await env.REPLAYS.put(r2Key, bytes);
