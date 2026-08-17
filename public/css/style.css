@@ -18,13 +18,13 @@
    See .name-raw below. */
 
 /* --accent-3 is the site's second accent colour (bright CGA magenta),
-   layered on top of theme.css's cyan --accent-2. Used sparingly and only
-   for one purpose: provenance/reference links on a game (the "verified via
-   WADB" link and "download replay") — links that point *away* from the
-   record, as opposed to cyan, which theme.css already uses everywhere for
-   emphasis/highlight (rank-1, qualified badge, win streaks, active state).
-   Keeping magenta scoped to that single link category means it stays a
-   recognisable signal instead of just becoming a second white noise. */
+   layered on top of theme.css's cyan --accent-2. Deliberately scoped to two
+   things: a game's actual winner (.winner-tag, .wl-badge.w on the
+   standings page) and provenance/reference links (.dl-link — "verified via
+   WADB", "download replay"). Cyan stays reserved for everything else that
+   already used it for emphasis/highlight (ladder rank-1, qualified badge,
+   win streaks, active filter state) — it's about *ranking/aggregate*
+   standing, whereas magenta marks *this specific result*. */
 :root { --panel-2: #0A0A0A; --err: #FF5555; --accent-3: #FF66FF; }
 
 body { font-size: 18px; min-height: 100vh; padding-bottom: 70px; }
@@ -140,7 +140,7 @@ tr:hover td { background: var(--panel-2); }
 .gamecard .top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .gamecard .players { font-size: 16px; color: var(--fg-bright); }
 .gamecard .meta { font-size: 13.5px; color: var(--fg-dim); margin-top: 4px; }
-.winner-tag { color: var(--accent-2); }
+.winner-tag { color: var(--accent-3); }
 .draw-tag { color: var(--fg-dim); }
 .unresolved-tag { color: var(--err); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 
@@ -235,7 +235,7 @@ tr:hover td { background: var(--panel-2); }
   display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px;
   font-size: 11.5px; border: 1px solid var(--border-mid); color: var(--fg-dim); margin-right: 8px;
 }
-.wl-badge.w { color: var(--accent-2); border-color: var(--accent-2); }
+.wl-badge.w { color: var(--accent-3); border-color: var(--accent-3); }
 
 .dl-link { color: var(--accent-3); text-decoration: none; border-bottom: 1px dotted var(--accent-3); font-size: 14px; }
 .dl-link:hover { border-bottom-style: solid; filter: brightness(1.3); }
