@@ -86,10 +86,10 @@ function load(f) {
       render();
     } catch (ex) {
       out.hidden = true;
-      errEl.innerHTML = `<div class="err">${esc(ex.message)}</div>`;
+      errEl.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
     }
   };
-  fr.onerror = () => { errEl.innerHTML = `<div class="err">Could not read that file.</div>`; };
+  fr.onerror = () => { errEl.innerHTML = `<div class="err name-raw">Could not read that file.</div>`; };
   fr.readAsArrayBuffer(f);
 }
 
@@ -160,7 +160,7 @@ async function submit() {
 
   for (let i = 0; i < mapping.length; i++) {
     if (!mapping[i].playerId && !mapping[i].newName) {
-      msg.innerHTML = `<div class="err">Map "${esc(players[i].rawName)}" to a player before submitting.</div>`;
+      msg.innerHTML = `<div class="err name-raw">Map "${esc(players[i].rawName)}" to a player before submitting.</div>`;
       return;
     }
   }
@@ -201,7 +201,7 @@ async function submit() {
     msg.innerHTML = `<div class="ok">Submitted. ${outcomeLine} &middot; <a href="/standings.html">View standings &rarr;</a></div>`;
     submitBtn.textContent = 'Submitted';
   } catch (ex) {
-    msg.innerHTML = `<div class="err">${esc(ex.message)}</div>`;
+    msg.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
     submitBtn.disabled = false;
     submitBtn.textContent = 'Confirm & submit';
   }

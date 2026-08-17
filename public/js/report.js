@@ -66,7 +66,7 @@ if (btn) {
     const reporterName = backdrop.querySelector('#reportName').value.trim();
 
     if (!message) {
-      msgEl.innerHTML = `<div class="err">Describe the issue before submitting.</div>`;
+      msgEl.innerHTML = `<div class="err name-raw">Describe the issue before submitting.</div>`;
       return;
     }
 
@@ -83,10 +83,10 @@ if (btn) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not submit that.');
-      msgEl.innerHTML = `<div class="ok">Sent. Thanks — an admin will take a look.</div>`;
+      msgEl.innerHTML = `<div class="ok name-raw">Sent. Thanks - an admin will take a look.</div>`;
       setTimeout(close, 1600);
     } catch (ex) {
-      msgEl.innerHTML = `<div class="err">${esc(ex.message)}</div>`;
+      msgEl.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
       submitBtn.disabled = false;
       submitBtn.textContent = 'Submit report';
     }

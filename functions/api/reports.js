@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
     `SELECT COUNT(*) AS count FROM reports WHERE ip_address = ? AND submitted_at >= datetime('now', ?)`
   ).bind(ip, `-${RATE_LIMIT_WINDOW_MIN} minutes`).first();
   if (recent.count >= RATE_LIMIT_MAX) {
-    return Response.json({ error: 'Too many reports submitted recently — please try again later.' }, { status: 429 });
+    return Response.json({ error: 'Too many reports submitted recently - please try again later.' }, { status: 429 });
   }
 
   await env.DB.prepare(

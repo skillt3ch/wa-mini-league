@@ -114,7 +114,7 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const ok = await tryUnlock(pwInput.value);
-  if (!ok) document.getElementById('loginErr').innerHTML = `<div class="err">Wrong password.</div>`;
+  if (!ok) document.getElementById('loginErr').innerHTML = `<div class="err name-raw">Wrong password.</div>`;
 });
 pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginBtn').click(); });
 
@@ -181,7 +181,7 @@ function renderPanel() {
       });
       const data = await res.json();
       if (res.ok) {
-        msg.innerHTML = `<div class="ok">Saved.</div>`;
+        msg.innerHTML = `<div class="ok name-raw">Saved.</div>`;
         const g = allGames.find(x => x.id === id);
         if (g) {
           g.isDraw = isDraw;
@@ -191,7 +191,7 @@ function renderPanel() {
           g.winnerSource = 'manual';
         }
       } else {
-        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+        msg.innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
       }
     });
     card.querySelector('.delete-btn').addEventListener('click', async () => {
@@ -205,7 +205,7 @@ function renderPanel() {
         allGames = allGames.filter(x => x.id !== id);
       } else {
         const data = await res.json();
-        card.querySelector('.save-msg').innerHTML = `<div class="err">${esc(data.error)}</div>`;
+        card.querySelector('.save-msg').innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
       }
     });
   });
@@ -248,7 +248,7 @@ function renderPlayers() {
     card.querySelector('.merge-btn').addEventListener('click', async () => {
       const sel = card.querySelector('.merge-select');
       const intoId = Number(sel.value);
-      if (!intoId) { msg.innerHTML = `<div class="err">Choose a player to merge into first.</div>`; return; }
+      if (!intoId) { msg.innerHTML = `<div class="err name-raw">Choose a player to merge into first.</div>`; return; }
       const fromName = allPlayers.find(x => x.playerId === id)?.name || '';
       const intoName = allPlayers.find(x => x.playerId === intoId)?.name || '';
       if (!confirm(`Merge "${fromName}" into "${intoName}"? All of "${fromName}"'s games and aliases move to "${intoName}", and "${fromName}" is deleted. This cannot be undone.`)) return;
@@ -262,7 +262,7 @@ function renderPlayers() {
       if (res.ok) {
         await Promise.all([loadPlayers(), loadPanel()]);
       } else {
-        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+        msg.innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
       }
     });
 
@@ -278,7 +278,7 @@ function renderPlayers() {
         renderPlayers();
       } else {
         const data = await res.json();
-        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+        msg.innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
       }
     });
   });
@@ -332,7 +332,7 @@ function renderReports() {
         renderReports();
       } else {
         const data = await res.json();
-        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+        msg.innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
       }
     });
 
@@ -347,7 +347,7 @@ function renderReports() {
         renderReports();
       } else {
         const data = await res.json();
-        msg.innerHTML = `<div class="err">${esc(data.error)}</div>`;
+        msg.innerHTML = `<div class="err name-raw">${esc(data.error)}</div>`;
       }
     });
   });
