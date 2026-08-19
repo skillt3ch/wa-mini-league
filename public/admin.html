@@ -98,6 +98,16 @@
 <script type="module">
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+// Renders an IP address as a clickable lookup link (opens in a new tab) —
+// only for super admins, since this is only ever called with a value that
+// already survived the server-side redaction. Falls back to plain text for
+// the rare 'unknown' capture-failure case, which isn't a real address to
+// look up.
+function ipLink(ip) {
+  if (!ip || ip === 'unknown') return esc(ip || 'unknown');
+  return `<a class="dl-link" href="https://whatismyipaddress.com/ip/${encodeURIComponent(ip)}" target="_blank" rel="noopener">${esc(ip)}</a>`;
+}
+
 // Reads a fetch response as JSON, but if the body isn't valid JSON (an HTML
 // error page from an unbuilt/broken route, a Cloudflare error page, an
 // empty body, etc.) throws an error that says so instead of surfacing the
@@ -396,7 +406,7 @@ const HISTORY_SOURCE_LABELS = { wadb: 'verified via WADB', submitter: 'self-repo
 
 function formatHistoryEntry(entry) {
   const when = new Date(entry.createdAt.replace(' ', 'T') + 'Z').toLocaleString();
-  const ipTag = entry.adminIp ? ` &middot; <span class="name-raw">IP ${esc(entry.adminIp)}</span>` : '';
+  const ipTag = entry.adminIp ? ` &middot; <span class="name-raw">IP ${ipLink(entry.adminIp)}</span>` : '';
 
   let headline;
   if (entry.action === 'submitted') {
@@ -548,7 +558,7 @@ function renderReports() {
         <span class="meta">
           <span class="name-raw">${r.reporterName ? esc(r.reporterName) : 'anonymous'}</span>
           &middot; ${r.submittedAt ? new Date(r.submittedAt).toISOString().slice(0,10) : 'unknown'}
-          ${r.ipAddress ? ` &middot; ip ${esc(r.ipAddress)}` : ''}
+          ${r.ipAddress ? ` &middot; ip ${ipLink(r.ipAddress)}` : ''}
         </span>
       </div>
       <p style="white-space:pre-wrap; color:var(--fg-bright); margin:10px 0 0; font-size:15px;">${esc(r.message)}</p>
