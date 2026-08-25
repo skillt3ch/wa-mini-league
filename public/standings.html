@@ -54,7 +54,7 @@
   </section>
 
   <section id="games-section">
-    <div class="shead sticky"><h2>Games</h2><div class="rule"></div></div>
+    <div class="shead sticky"><h2>Games</h2><span class="count-badge" id="gamesCount"></span><div class="rule"></div></div>
     <div class="filter-row">
       <div class="filter-btns">
         <button class="opt small game-sort-btn" data-sort="submitted" aria-pressed="true">Newest submitted</button>
@@ -117,6 +117,7 @@ const gamesWrap = document.getElementById('gamesWrap');
 const searchInput = document.getElementById('search');
 const chipEl = document.getElementById('playerFilterChip');
 const updatedLine = document.getElementById('updatedLine');
+const gamesCountEl = document.getElementById('gamesCount');
 
 let standings = [];
 let games = [];
@@ -242,6 +243,7 @@ function gameMatchesFilters(g) {
 }
 
 function renderGames() {
+  gamesCountEl.textContent = `(${games.length})`;
   chipEl.innerHTML = playerFilter
     ? `<div class="active-filter">Showing games for <span class="name-raw">${esc(playerFilter.name)}</span>
         <button class="opt small" id="clearFilterBtn">Clear</button></div>`
