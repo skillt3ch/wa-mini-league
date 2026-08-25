@@ -206,6 +206,12 @@ function renderLadder() {
           const diversityPct = maxDiversityRatio > 0 ? (diversityRatio / maxDiversityRatio) * 100 : 0;
           const isDiversityLeader = r.isActivityLeader && r.gamesPlayed >= MIN_GAMES_FOR_DIVERSITY_HIGHLIGHT;
           const diversityTitle = `${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'} (${diversityRatio.toFixed(2)}× — higher is more diverse)${isDiversityLeader ? ' — leading Most Active' : ''}`;
+          // Rank 1 (standings.js already sorts wins desc, games desc, name
+          // asc) *is* the Most Wins prize leader by definition — no ties to
+          // reconcile the way Most Active needs, since the games-played
+          // tiebreak always resolves to exactly one row. Just guard against
+          // highlighting an all-zero-wins ladder (e.g. only draws so far).
+          const isWinsLeader = r.rank === 1 && r.wins > 0;
           return `
           <tr class="${rankClass} fade-in">
             <td class="rank" data-label="#">${r.rank}</td>
@@ -213,7 +219,7 @@ function renderLadder() {
               <button class="player-link name-raw" data-id="${r.playerId}" data-name="${esc(r.name)}">${esc(r.name)}</button>
               <span class="played-badge" title="${playedTitle}">played ${playedRelative}</span>
             </td>
-            <td data-label="Wins">${r.wins}</td>
+            <td data-label="Wins"${isWinsLeader ? ' class="wins-leader" title="Leading Most Wins"' : ''}>${r.wins}</td>
             <td data-label="Faced">${r.uniqueOpponents}</td>
             <td data-label="Games">${r.gamesPlayed}</td>
             <td data-label="Diversity">
