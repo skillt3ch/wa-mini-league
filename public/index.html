@@ -146,7 +146,7 @@ function render() {
           style="display:${mapping[i].newName !== null ? 'inline-block' : 'none'}"
           value="${mapping[i].newName ? esc(mapping[i].newName) : esc(p.rawName)}">
       </div>
-      <div class="hint">team "<span class="name-raw">${esc(p.teamName)}</span>" &middot; ${p.colour} &middot; ${p.shots} shots &middot; ${p.turns} turns</div>
+      <div class="hint">team "<span class="name-raw">${esc(p.teamName)}</span>" | ${p.colour} | ${p.shots} shots | ${p.turns} turns</div>
     </div>`;
   });
   html += `</section>
@@ -263,7 +263,7 @@ async function submit(manualWinner) {
     else if (data.outcomeStatus === 'draw') outcomeLine = `Result: Draw${selfReported}`;
     else outcomeLine = `<span class="name-raw">Winner couldn't be auto-verified - an admin will confirm it.</span>`;
 
-    msg.innerHTML = `<div class="ok">Submitted. ${outcomeLine} &middot; <a href="/standings.html">View standings &rarr;</a></div>`;
+    msg.innerHTML = `<div class="ok">Submitted. ${outcomeLine} | <a href="/standings.html">View standings -&gt;</a></div>`;
     submitBtn.hidden = true;
   } catch (ex) {
     msg.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;

@@ -180,9 +180,9 @@ function renderPager(containerId, page, totalPages, onChange) {
   const el = document.getElementById(containerId);
   if (totalPages <= 1) { el.innerHTML = ''; return; }
   el.innerHTML = `
-    <button class="opt small pager-prev" ${page <= 1 ? 'disabled' : ''}>&laquo; Prev</button>
+    <button class="opt small pager-prev" ${page <= 1 ? 'disabled' : ''}>&lt; Prev</button>
     <span class="pager-label">Page ${page} of ${totalPages}</span>
-    <button class="opt small pager-next" ${page >= totalPages ? 'disabled' : ''}>Next &raquo;</button>
+    <button class="opt small pager-next" ${page >= totalPages ? 'disabled' : ''}>Next &gt;</button>
   `;
   if (page > 1) el.querySelector('.pager-prev').addEventListener('click', () => onChange(page - 1));
   if (page < totalPages) el.querySelector('.pager-next').addEventListener('click', () => onChange(page + 1));
@@ -282,11 +282,11 @@ function renderPanel() {
         <span class="players name-raw">${g.players.map(p => esc(p.playerName)).join(' vs ')}</span>
         <span class="meta">
           ${g.outcomeStatus === 'unresolved'
-            ? '<span class="unresolved-tag">Needs review</span> &middot; '
-            : g.winnerSource === 'submitter' ? '<span class="self-reported-tag">Self-reported</span> &middot; ' : ''}
+            ? '<span class="unresolved-tag">Needs review</span> | '
+            : g.winnerSource === 'submitter' ? '<span class="self-reported-tag">Self-reported</span> | ' : ''}
           added ${g.submittedAt ? new Date(g.submittedAt).toISOString().slice(0,10) : 'unknown'}
-          &middot; played ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'unknown'}
-          ${g.winnerSource ? ` &middot; ${g.winnerSource === 'wadb' ? 'verified via WADB' : g.winnerSource === 'submitter' ? 'self-reported by submitter' : 'set manually'}` : ''}
+          | played ${g.playedAt ? new Date(g.playedAt).toISOString().slice(0,10) : 'unknown'}
+          ${g.winnerSource ? ` | ${g.winnerSource === 'wadb' ? 'verified via WADB' : g.winnerSource === 'submitter' ? 'self-reported by submitter' : 'set manually'}` : ''}
         </span>
       </div>
       ${g.outcomeStatus === 'unresolved' && g.outcomeNote ? `<div class="hint name-raw" style="margin-top:6px;">${esc(g.outcomeNote)}</div>` : ''}
@@ -409,21 +409,21 @@ const HISTORY_SOURCE_LABELS = { wadb: 'verified via WADB', submitter: 'self-repo
 
 function formatHistoryEntry(entry) {
   const when = new Date(entry.createdAt.replace(' ', 'T') + 'Z').toLocaleString();
-  const ipTag = entry.adminIp ? ` &middot; <span class="name-raw">IP ${ipLink(entry.adminIp)}</span>` : '';
+  const ipTag = entry.adminIp ? ` | <span class="name-raw">IP ${ipLink(entry.adminIp)}</span>` : '';
 
   let headline;
   if (entry.action === 'submitted') {
     const sourceLabel = HISTORY_SOURCE_LABELS[entry.new.winnerSource] || '';
     headline = `Submitted — ${historyStateLabel(entry.new)}${sourceLabel ? ` (${sourceLabel})` : ''}`;
   } else if (entry.action === 'winner_edit') {
-    headline = `Admin changed the result: ${historyStateLabel(entry.old)} &rarr; ${historyStateLabel(entry.new)}`;
+    headline = `Admin changed the result: ${historyStateLabel(entry.old)} -&gt; ${historyStateLabel(entry.new)}`;
   } else if (entry.action === 'wadb_recheck') {
     const changed = entry.old.winnerSource !== entry.new.winnerSource
       || entry.old.winnerName !== entry.new.winnerName
       || entry.old.isDraw !== entry.new.isDraw
       || entry.old.outcomeStatus !== entry.new.outcomeStatus;
     headline = changed
-      ? `Admin re-checked WADB — updated: ${historyStateLabel(entry.old)} &rarr; ${historyStateLabel(entry.new)}`
+      ? `Admin re-checked WADB — updated: ${historyStateLabel(entry.old)} -&gt; ${historyStateLabel(entry.new)}`
       : `Admin re-checked WADB — no change (${historyStateLabel(entry.new)})`;
   } else {
     headline = entry.action;
@@ -431,7 +431,7 @@ function formatHistoryEntry(entry) {
 
   return `<div class="history-entry">
     <div class="name-raw">${headline}${ipTag}</div>
-    <div class="hint">${esc(when)}${entry.note ? ` &middot; ${esc(entry.note)}` : ''}</div>
+    <div class="hint">${esc(when)}${entry.note ? ` | ${esc(entry.note)}` : ''}</div>
   </div>`;
 }
 
@@ -478,7 +478,7 @@ function renderPlayers() {
         <span class="players name-raw">${esc(p.name)}</span>
         <span class="meta">
           ${p.gameCount} game${p.gameCount === 1 ? '' : 's'}
-          ${p.aliases.length ? ` &middot; aliases: <span class="name-raw">${p.aliases.map(esc).join(', ')}</span>` : ''}
+          ${p.aliases.length ? ` | aliases: <span class="name-raw">${p.aliases.map(esc).join(', ')}</span>` : ''}
         </span>
       </div>
       <div class="row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -556,12 +556,12 @@ function renderReports() {
       <div class="top">
         <span class="players">
           ${CATEGORY_LABELS[r.category] || 'Other'}
-          ${r.status === 'open' ? ' &middot; <span class="unresolved-tag">Open</span>' : ''}
+          ${r.status === 'open' ? ' | <span class="unresolved-tag">Open</span>' : ''}
         </span>
         <span class="meta">
           <span class="name-raw">${r.reporterName ? esc(r.reporterName) : 'anonymous'}</span>
-          &middot; ${r.submittedAt ? new Date(r.submittedAt).toISOString().slice(0,10) : 'unknown'}
-          ${r.ipAddress ? ` &middot; ip ${ipLink(r.ipAddress)}` : ''}
+          | ${r.submittedAt ? new Date(r.submittedAt).toISOString().slice(0,10) : 'unknown'}
+          ${r.ipAddress ? ` | ip ${ipLink(r.ipAddress)}` : ''}
         </span>
       </div>
       <p style="white-space:pre-wrap; color:var(--fg-bright); margin:10px 0 0; font-size:15px;">${esc(r.message)}</p>

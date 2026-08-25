@@ -18,14 +18,15 @@
    See .name-raw below. */
 
 /* --accent-3 is the site's second accent colour (bright CGA magenta),
-   layered on top of theme.css's cyan --accent-2. Previously marked a
-   game's winner, but the games log deliberately doesn't call attention to
-   winners/losers anymore (see .victory-icon, a quiet fg-dim glyph
-   instead) — so --accent-3 is currently unclaimed, kept defined for a
-   future signal that actually warrants standing out. Cyan stays reserved
-   for ranking/aggregate stuff (ladder rank-1, activity-leader badge, win
-   streaks, active filter state); .dl-link uses --fg-bright instead of
-   either accent, since a plain reference link isn't a result. */
+   layered on top of theme.css's cyan --accent-2. Scoped to one thing: a
+   game's winner (.winner-name) — but deliberately only in the expanded
+   game-detail view. The collapsed row stays quiet on purpose (a small
+   .victory-icon star, fg-dim, not a colour) so the log doesn't read as a
+   scoreboard at a glance; the magenta only shows up once you've opted in
+   by expanding a specific game. Cyan stays reserved for ranking/aggregate
+   stuff (ladder rank-1, activity-leader badge, win streaks, active filter
+   state); .dl-link uses --fg-bright instead of either accent, since a
+   plain reference link isn't a result. */
 :root { --panel-2: #0A0A0A; --err: #FF5555; --accent-3: #FF66FF; }
 
 body { font-size: 18px; min-height: 100vh; padding-bottom: 70px; }
@@ -150,7 +151,10 @@ tr:hover td { background: var(--panel-2); }
 .gamecard .players { font-size: 16px; color: var(--fg-bright); }
 .gamecard .meta { font-size: 13.5px; color: var(--fg-dim); margin-top: 4px; }
 .draw-tag { color: var(--fg-dim); }
-.victory-icon { color: var(--fg-dim); font-size: 11px; vertical-align: 1px; }
+.victory-icon { color: var(--fg-dim); font-size: 11px; vertical-align: 1px; font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace; }
+/* Winner gets the magenta treatment only once expanded — the collapsed
+   row stays quiet with just .victory-icon's star. */
+.winner-name { color: var(--accent-3); }
 .unresolved-tag { color: var(--err); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .self-reported-tag { color: var(--fg-bright); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 
@@ -254,7 +258,10 @@ tr:hover td { background: var(--panel-2); }
 }
 .game-detail .gd-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
 
-.dl-link { color: var(--fg-bright); text-decoration: none; border-bottom: 1px dotted var(--border-mid); font-size: 14px; }
+/* Always carries a special-character arrow glyph (WADB's ↗, download's ↓)
+   — default to JetBrains Mono here rather than trusting every call site to
+   remember to wrap it, same policy as .err/.ok above. */
+.dl-link { color: var(--fg-bright); text-decoration: none; border-bottom: 1px dotted var(--border-mid); font-size: 14px; font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace; }
 .dl-link:hover { border-bottom-style: solid; color: var(--accent-2); border-color: var(--accent-2); }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }

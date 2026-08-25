@@ -29,7 +29,7 @@
 <div class="wrap">
   <header class="tool-header">
     <h1>Standings</h1>
-    <p>Two prizes: <b>Most Wins</b> takes the top ladder spot by total wins (ties broken by games played), and <b>Most Active</b> rewards facing the widest spread of opponents, scored as games played &times; unique opponents faced. The full game log sits below the ladder.</p>
+    <p>Two prizes: <b>Most Wins</b> takes the top ladder spot by total wins (ties broken by games played), and <b>Most Active</b> rewards facing the widest spread of opponents, scored as games played x unique opponents faced. The full game log sits below the ladder.</p>
   </header>
   <nav class="tab-bar">
     <a href="/">Submit</a>
@@ -70,6 +70,28 @@
 
 <script type="module">
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// Same session-password check as public/js/adminNav.js (which only
+// controls the nav tab) — this page separately needs to know admin status
+// itself, to decide whether to show a Delete button on each expanded
+// game. Nothing here trusts the client: the DELETE call still requires a
+// valid X-Admin-Password header, checked server-side same as admin.html.
+function getAdminPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
+let isAdmin = false;
+async function checkAdmin() {
+  const pw = getAdminPw();
+  if (!pw) return false;
+  try {
+    const res = await fetch('/api/admin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 function dur(s) {
   s = Math.round(s || 0);
   const m = Math.floor(s / 60);
@@ -149,20 +171,28 @@ function renderLadder() {
     return;
   }
 
+  // Diversity ratio = opponents faced per game played. It has no natural
+  // ceiling — a single free-for-all can mean several opponents in one
+  // game, so this regularly exceeds 1. Scaling the bar against a fixed
+  // 100% (= ratio of 1) made every FFA-heavy player's bar look identically
+  // maxed out, which is exactly backwards: those are the *more* diverse
+  // players and should stand out more, not blend together. Scale against
+  // the highest ratio on the whole ladder instead (not just the filtered/
+  // searched view, so a bar's width doesn't jump around as you search) —
+  // the most diverse player gets a full bar, everyone else is relative to
+  // them.
+  const maxDiversityRatio = Math.max(0, ...standings.map(r => r.gamesPlayed > 0 ? r.uniqueOpponents / r.gamesPlayed : 0));
+
   ladderWrap.innerHTML = `
     <table id="ladder">
-      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th>Faced</th><th>Games</th><th>Diversity</th><th>Streak</th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th>Faced</th><th>Games</th><th title="Opponents faced per game played, relative to the most diverse player on the ladder">Diversity</th><th>Streak</th></tr></thead>
       <tbody>
         ${filtered.map(r => {
           const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
           const playedRelative = r.lastPlayedAt ? relativeTime(new Date(r.lastPlayedAt)) : 'never';
           const playedTitle = r.lastPlayedAt ? new Date(r.lastPlayedAt).toLocaleString() : '';
-          // Diversity bar: opponents faced per game played. Can exceed 1
-          // in free-for-alls (one game can mean several opponents at
-          // once), so the bar clamps at 100% width but the raw fraction
-          // is always shown as text alongside it.
           const diversityRatio = r.gamesPlayed > 0 ? r.uniqueOpponents / r.gamesPlayed : 0;
-          const diversityPct = Math.min(100, diversityRatio * 100);
+          const diversityPct = maxDiversityRatio > 0 ? (diversityRatio / maxDiversityRatio) * 100 : 0;
           return `
           <tr class="${rankClass} fade-in">
             <td class="rank" data-label="#">${r.rank}</td>
@@ -174,9 +204,9 @@ function renderLadder() {
             <td data-label="Faced">${r.uniqueOpponents}</td>
             <td data-label="Games">${r.gamesPlayed}</td>
             <td data-label="Diversity">
-              <div class="rate-cell" title="${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'}">
+              <div class="rate-cell" title="${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'} (${diversityRatio.toFixed(2)}× — higher is more diverse)">
                 <div class="rate-bar"><i style="width:${diversityPct}%"></i></div>
-                <span>${r.uniqueOpponents}/${r.gamesPlayed}</span>
+                <span>${diversityRatio.toFixed(2)}x</span>
               </div>
             </td>
             <td data-label="Streak">${streakHtml(r.playerId)}</td>
@@ -274,13 +304,22 @@ function renderGames() {
             : unresolved ? `<span class="hint">awaiting admin review</span>` : '';
     const detail = isExpanded ? `
       <div class="game-detail">
-        <div class="gd-row"><span>Duration</span><span>${dur(g.durationSeconds)} &middot; ${g.turns} turns</span></div>
-        ${g.players.map(p => `
+        <div class="gd-row"><span>Duration</span><span>${dur(g.durationSeconds)} | ${g.turns} turns</span></div>
+        ${g.players.map(p => {
+          const isWinner = !unresolved && !g.isDraw && p.playerId === g.winnerPlayerId;
+          return `
           <div class="gd-row">
-            <span class="name-raw">${esc(p.playerName)}</span>
-            <span>${p.shots} shots &middot; ${p.turns} turns</span>
-          </div>`).join('')}
+            <span class="name-raw${isWinner ? ' winner-name' : ''}">${esc(p.playerName)}</span>
+            <span>${p.shots} shots | ${p.turns} turns</span>
+          </div>`;
+        }).join('')}
         <div class="gd-row"><span>${provenance}</span><a class="dl-link" href="${g.replayDownloadUrl}">[&darr;] download replay</a></div>
+        ${isAdmin ? `
+        <div class="gd-row">
+          <span></span>
+          <button class="opt small danger delete-game-btn" data-id="${g.id}">Delete this game</button>
+        </div>
+        <div class="delete-msg" data-game-id="${g.id}"></div>` : ''}
       </div>` : '';
     return row + detail;
   }).join('');
@@ -290,6 +329,41 @@ function renderGames() {
       const id = +btn.dataset.id;
       if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
       renderGames();
+    });
+  });
+
+  // Admin-only — the button itself only renders when isAdmin is true, but
+  // the actual deletion is still gated server-side by X-Admin-Password on
+  // every request, same as the admin panel's own delete.
+  gamesWrap.querySelectorAll('.delete-game-btn').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation(); // don't also toggle the row's expand/collapse
+      const id = +btn.dataset.id;
+      if (!confirm('Delete this game submission? This cannot be undone.')) return;
+      const msg = gamesWrap.querySelector(`.delete-msg[data-game-id="${id}"]`);
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+      try {
+        const res = await fetch(`/api/admin/games/${id}`, {
+          method: 'DELETE',
+          headers: { 'X-Admin-Password': getAdminPw() }
+        });
+        const text = await res.text();
+        let data = null;
+        if (text) {
+          try { data = JSON.parse(text); }
+          catch { throw new Error(`Server returned a non-JSON response (HTTP ${res.status}).`); }
+        }
+        if (!res.ok) throw new Error(data?.error || `Delete failed (HTTP ${res.status}).`);
+        // Deleting a game changes ladder stats too, not just the log —
+        // reload both rather than just patching the games array locally.
+        expanded.delete(id);
+        await load();
+      } catch (ex) {
+        if (msg) msg.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
+        btn.disabled = false;
+        btn.textContent = 'Delete this game';
+      }
     });
   });
 }
@@ -340,12 +414,14 @@ setInterval(renderUpdatedLine, 30000);
 
 async function load() {
   try {
-    const [standingsRes, gamesRes] = await Promise.all([
+    const [standingsRes, gamesRes, adminOk] = await Promise.all([
       fetch('/api/standings').then(r => r.json()),
-      fetch('/api/games').then(r => r.json())
+      fetch('/api/games').then(r => r.json()),
+      checkAdmin()
     ]);
     standings = standingsRes;
     games = gamesRes;
+    isAdmin = adminOk;
     streaks = computeStreaks(games);
     renderLadder();
     renderGames();
