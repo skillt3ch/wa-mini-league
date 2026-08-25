@@ -63,6 +63,14 @@
           <button class="opt small sort-btn" data-sort="played" aria-pressed="false">Date played</button>
         </div>
       </div>
+      <div id="sourceFilterRow" class="filter-row">
+        <div class="filter-btns">
+          <button class="opt small source-filter-btn" data-source="all" aria-pressed="true">All</button>
+          <button class="opt small source-filter-btn" data-source="wadb" aria-pressed="false">WADB-verified</button>
+          <button class="opt small source-filter-btn" data-source="submitter" aria-pressed="false">Self-reported</button>
+          <button class="opt small source-filter-btn" data-source="manual" aria-pressed="false">Manually set</button>
+        </div>
+      </div>
       <main id="panel"></main>
       <div class="pager" id="gamesPager"></div>
     </div>
@@ -147,6 +155,7 @@ let allGames = [];
 let allPlayers = [];
 let allReports = [];
 let sortMode = 'added'; // 'added' | 'played'
+let sourceFilter = 'all'; // 'all' | 'wadb' | 'submitter' | 'manual'
 let gamesPage = 1, playersPage = 1, reportsPage = 1;
 let playersSearch = '';
 
@@ -237,6 +246,20 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
   });
 });
 
+// Filters by winnerSource ('wadb' / 'submitter' / 'manual'). Unresolved
+// games have no winnerSource yet, so they naturally drop out of any
+// specific-source filter and only show up under "All" — consistent with
+// them not having been verified any particular way yet.
+document.querySelectorAll('.source-filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sourceFilter = btn.dataset.source;
+    document.querySelectorAll('.source-filter-btn').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+    gamesPage = 1;
+    renderPanel();
+  });
+});
+
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const ok = await tryUnlock(pwInput.value);
   if (!ok) document.getElementById('loginErr').innerHTML = `<div class="err name-raw">Wrong password.</div>`;
@@ -257,15 +280,25 @@ async function loadPanel() {
   renderPanel();
 }
 
+const SOURCE_FILTER_LABELS = { wadb: 'WADB-verified', submitter: 'self-reported', manual: 'manually set' };
+
 function renderPanel() {
   document.getElementById('gamesCount').textContent = `(${allGames.length})`;
   if (!allGames.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; document.getElementById('gamesPager').innerHTML = ''; return; }
+
+  const filteredGames = sourceFilter === 'all' ? allGames : allGames.filter(g => g.winnerSource === sourceFilter);
+
+  if (!filteredGames.length) {
+    panel.innerHTML = `<div class="hint">No ${SOURCE_FILTER_LABELS[sourceFilter] || ''} games.</div>`;
+    document.getElementById('gamesPager').innerHTML = '';
+    return;
+  }
 
   // Unresolved games (WADB couldn't determine a winner) need attention —
   // surface them first regardless of sort mode. Within each group, sort by
   // either upload time (default — surfaces what just came in, even if it's
   // a replay of an old match) or the in-game date, submitter's choice.
-  const sorted = [...allGames].sort((a, b) => {
+  const sorted = [...filteredGames].sort((a, b) => {
     const unresolvedDiff = (a.outcomeStatus === 'unresolved' ? 0 : 1) - (b.outcomeStatus === 'unresolved' ? 0 : 1);
     if (unresolvedDiff !== 0) return unresolvedDiff;
     const aDate = sortMode === 'played' ? (a.playedAt || a.submittedAt) : a.submittedAt;
