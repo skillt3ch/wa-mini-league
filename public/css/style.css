@@ -26,12 +26,15 @@
      at a glance; the magenta only shows up once you've opted in by
      expanding a specific game.
    - the submit page's dropzone (.drop) — the one actionable target there.
-   - the ladder's Diversity cell for the Most Active prize leader
-     (.rate-cell.diversity-leader), gated by a minimum games-played floor
-     so a fluke small-sample tie (e.g. a 1-game 1.00x) never gets crowned.
    - the ladder's Wins cell for the Most Wins prize leader (td.wins-leader)
      — rank 1 on the ladder is that leader by definition, guarded only
      against an all-zero-wins board.
+   - the ladder's Activity cell for the Most Active prize leader
+     (td.activity-leader) — deliberately not the Diversity cell, since a
+     ratio like 0.73x doesn't visually explain why it can beat a "perfect"
+     1.00x from a small sample; Activity shows the actual gamesPlayed ×
+     uniqueOpponents score, gated by a minimum games-played floor so a
+     1-game fluke never gets it.
    Cyan stays reserved for everything else ranking/aggregate on the ladder
    (rank-1/2/3 row markers, win streaks, active filter state); .dl-link
    uses --fg-bright instead of either accent, since a plain reference link
@@ -240,15 +243,17 @@ tr:hover td { background: var(--panel-2); }
 .rate-cell { display: flex; align-items: center; gap: 10px; }
 .rate-bar { width: 58px; height: 5px; background: var(--border-dim); position: relative; flex: none; }
 .rate-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-2); display: block; }
-/* Third meaning for --accent-3 (see the top-of-file note): the Most Active
-   prize leader's Diversity cell, gated in standings.html by a minimum
-   games-played floor so a 1-game 1.00x fluke never gets the highlight. */
-.rate-cell.diversity-leader .rate-bar i { background: var(--accent-3); }
-.rate-cell.diversity-leader span { color: var(--accent-3); }
-/* Fourth: the Most Wins prize leader's Wins cell — rank 1 on the ladder
-   is that leader by definition (see standings.html's isWinsLeader), no
-   extra tie-handling needed, just a guard against an all-zero-wins board. */
+/* Third meaning for --accent-3 (see the top-of-file note): the Most Wins
+   prize leader's Wins cell — rank 1 on the ladder is that leader by
+   definition (see standings.html's isWinsLeader), no extra tie-handling
+   needed, just a guard against an all-zero-wins board. */
 #ladder td.wins-leader { color: var(--accent-3); font-weight: 600; }
+/* Fourth: the Most Active prize leader's Activity cell (the literal
+   gamesPlayed × uniqueOpponents score, not the Diversity ratio — the
+   ratio alone doesn't explain why a lower-looking number can win, so the
+   highlight lives on the number that actually decides it), gated by a
+   minimum games-played floor so a 1-game 1.00x fluke never gets it. */
+#ladder td.activity-leader { color: var(--accent-3); font-weight: 600; }
 
 /* ---- games log: compact rows, expand on click ---- */
 .game-row {

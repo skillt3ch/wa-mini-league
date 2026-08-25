@@ -157,12 +157,11 @@ function streakHtml(playerId) {
 // A player can hit a "perfect" 1.00x diversity ratio off a single game
 // against a single opponent — that's not meaningfully diverse, just a
 // small sample. Require at least this many games before the Most Active
-// leader's Diversity cell gets the magenta call-out, so an early/low-volume
-// tie doesn't get crowned alongside (or instead of) someone with a real
-// track record. isActivityLeader itself (games x opponents) already
-// suppresses most of this since low-volume players score low, but this is
-// a second, explicit floor for the visual highlight specifically.
-const MIN_GAMES_FOR_DIVERSITY_HIGHLIGHT = 5;
+// leader's Activity cell gets the magenta call-out, so an early/low-volume
+// tie doesn't get crowned. isActivityLeader itself (games x opponents)
+// already suppresses most of this since low-volume players score low, but
+// this is a second, explicit floor for the visual highlight specifically.
+const MIN_GAMES_FOR_ACTIVITY_HIGHLIGHT = 5;
 
 function renderLadder() {
   if (!standings.length) {
@@ -196,7 +195,7 @@ function renderLadder() {
 
   ladderWrap.innerHTML = `
     <table id="ladder">
-      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th>Faced</th><th>Games</th><th title="Opponents faced per game played, relative to the most diverse player on the ladder">Diversity</th><th>Streak</th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th>Faced</th><th>Games</th><th title="Opponents faced per game played, relative to the most diverse player on the ladder">Diversity</th><th title="Games played × unique opponents faced — the score behind the Most Active prize">Activity</th><th>Streak</th></tr></thead>
       <tbody>
         ${filtered.map(r => {
           const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
@@ -204,8 +203,14 @@ function renderLadder() {
           const playedTitle = r.lastPlayedAt ? new Date(r.lastPlayedAt).toLocaleString() : '';
           const diversityRatio = r.gamesPlayed > 0 ? r.uniqueOpponents / r.gamesPlayed : 0;
           const diversityPct = maxDiversityRatio > 0 ? (diversityRatio / maxDiversityRatio) * 100 : 0;
-          const isDiversityLeader = r.isActivityLeader && r.gamesPlayed >= MIN_GAMES_FOR_DIVERSITY_HIGHLIGHT;
-          const diversityTitle = `${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'} (${diversityRatio.toFixed(2)}× — higher is more diverse)${isDiversityLeader ? ' — leading Most Active' : ''}`;
+          const diversityTitle = `${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'} (${diversityRatio.toFixed(2)}× — higher is more diverse)`;
+          // Highlighted on the Activity cell, not Diversity — the ratio
+          // shown in Diversity doesn't itself explain why a lower-looking
+          // number (e.g. 0.73x from real volume) can outrank a "perfect"
+          // 1.00x from a couple of games. Activity shows the literal score
+          // the prize is decided by, so the highlighted number is always
+          // the one that's actually highest.
+          const isActivityLeaderHighlighted = r.isActivityLeader && r.gamesPlayed >= MIN_GAMES_FOR_ACTIVITY_HIGHLIGHT;
           // Rank 1 (standings.js already sorts wins desc, games desc, name
           // asc) *is* the Most Wins prize leader by definition — no ties to
           // reconcile the way Most Active needs, since the games-played
@@ -223,11 +228,12 @@ function renderLadder() {
             <td data-label="Faced">${r.uniqueOpponents}</td>
             <td data-label="Games">${r.gamesPlayed}</td>
             <td data-label="Diversity">
-              <div class="rate-cell${isDiversityLeader ? ' diversity-leader' : ''}" title="${diversityTitle}">
+              <div class="rate-cell" title="${diversityTitle}">
                 <div class="rate-bar"><i style="width:${diversityPct}%"></i></div>
                 <span>${diversityRatio.toFixed(2)}x</span>
               </div>
             </td>
+            <td data-label="Activity"${isActivityLeaderHighlighted ? ' class="activity-leader" title="Leading Most Active (games played × opponents faced)"' : ''}>${r.activityScore}</td>
             <td data-label="Streak">${streakHtml(r.playerId)}</td>
           </tr>`;
         }).join('')}
