@@ -35,6 +35,9 @@
      1.00x from a small sample; Activity shows the actual gamesPlayed ×
      uniqueOpponents score, gated by a minimum games-played floor so a
      1-game fluke never gets it.
+   - the prize names themselves in the standings intro copy (.prize-name,
+     wrapping "Most Wins"/"Most Active") — ties the two prize labels back
+     to the same colour used on their leader cells in the ladder below.
    Cyan stays reserved for everything else ranking/aggregate on the ladder
    (rank-1/2/3 row markers, win streaks, active filter state); .dl-link
    uses --fg-bright instead of either accent, since a plain reference link
@@ -254,6 +257,7 @@ tr:hover td { background: var(--panel-2); }
    highlight lives on the number that actually decides it), gated by a
    minimum games-played floor so a 1-game 1.00x fluke never gets it. */
 #ladder td.activity-leader { color: var(--accent-3); font-weight: 600; }
+.prize-name { color: var(--accent-3); }
 
 /* ---- games log: compact rows, expand on click ---- */
 .game-row {
