@@ -12,7 +12,17 @@
 //   - Most Active: a standalone Activity Score = gamesPlayed *
 //     uniqueOpponents, rewarding a wide spread of opponents over farming
 //     the same one or two people. isActivityLeader flags whoever holds
-//     the top score (ties share the flag).
+//     the top score. Small leagues hit exact score ties often enough
+//     (e.g. 20 games x 5 opponents = 10 games x 10 opponents = 100) that
+//     it needed a tiebreaker — diversity ratio (uniqueOpponents /
+//     gamesPlayed) was chosen over "more games" deliberately: games played
+//     already gets its due weight inside the score itself, so breaking
+//     ties toward it again would quietly turn this into a Most Games prize
+//     and undercut the reason the score is multiplicative in the first
+//     place. Rewarding diversity on tiebreak instead nudges a small,
+//     easily-fragmented player pool toward playing each other, not just
+//     the same one or two people. A genuine tie on both dimensions still
+//     shares the flag.
 export async function onRequestGet(context) {
   const { env } = context;
 
@@ -50,7 +60,8 @@ export async function onRequestGet(context) {
     winRate: r.games_played > 0 ? +(r.wins / r.games_played * 100).toFixed(1) : 0,
     uniqueOpponents: r.unique_opponents,
     lastPlayedAt: r.last_played_epoch ? new Date(r.last_played_epoch * 1000).toISOString() : null,
-    activityScore: r.games_played * r.unique_opponents
+    activityScore: r.games_played * r.unique_opponents,
+    diversityRatio: r.games_played > 0 ? +(r.unique_opponents / r.games_played).toFixed(4) : 0
   }));
 
   // Most Wins ranking: total wins first, games played as the tiebreaker
@@ -65,8 +76,13 @@ export async function onRequestGet(context) {
   );
 
   const topActivityScore = Math.max(0, ...standings.map(s => s.activityScore));
+  const tiedOnScore = standings.filter(s => topActivityScore > 0 && s.activityScore === topActivityScore);
+  const topDiversityRatioAmongTied = Math.max(0, ...tiedOnScore.map(s => s.diversityRatio));
   for (const s of standings) {
-    s.isActivityLeader = topActivityScore > 0 && s.activityScore === topActivityScore;
+    s.isActivityLeader =
+      topActivityScore > 0 &&
+      s.activityScore === topActivityScore &&
+      s.diversityRatio === topDiversityRatioAmongTied;
   }
 
   return Response.json(standings);
