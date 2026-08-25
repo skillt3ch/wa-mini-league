@@ -1,8 +1,9 @@
-// GET /api/standings — ladder: games played, wins, win rate per player.
-// Draws count toward games played but not toward either player's wins or
-// losses. Games still awaiting an admin's call (outcome_status = 'unresolved',
-// i.e. WADB couldn't determine a winner) are excluded entirely until
-// they're resolved, so a stuck game doesn't silently deflate anyone's record.
+// GET /api/standings — ladder: games played, wins, win rate, unique
+// opponents faced, per player. Draws count toward games played but not
+// toward either player's wins or losses. Games still awaiting an admin's
+// call (outcome_status = 'unresolved', i.e. WADB couldn't determine a
+// winner) are excluded entirely until they're resolved, so a stuck game
+// doesn't silently deflate anyone's record.
 export async function onRequestGet(context) {
   const { env } = context;
 
@@ -12,10 +13,12 @@ export async function onRequestGet(context) {
       p.name                                 AS name,
       COUNT(DISTINCT gp.game_id)             AS games_played,
       COUNT(DISTINCT CASE WHEN g.winner_player_id = p.id THEN g.id END) AS wins,
-      COUNT(DISTINCT CASE WHEN g.is_draw = 1 THEN g.id END) AS draws
+      COUNT(DISTINCT CASE WHEN g.is_draw = 1 THEN g.id END) AS draws,
+      COUNT(DISTINCT opp.player_id)          AS unique_opponents
     FROM players p
     JOIN game_players gp ON gp.player_id = p.id
     JOIN games g ON g.id = gp.game_id
+    LEFT JOIN game_players opp ON opp.game_id = gp.game_id AND opp.player_id != p.id
     WHERE g.outcome_status != 'unresolved'
     GROUP BY p.id
   `).all();
@@ -27,15 +30,21 @@ export async function onRequestGet(context) {
     wins: r.wins,
     draws: r.draws,
     losses: r.games_played - r.wins - r.draws,
-    winRate: r.games_played > 0 ? +(r.wins / r.games_played * 100).toFixed(1) : 0
+    winRate: r.games_played > 0 ? +(r.wins / r.games_played * 100).toFixed(1) : 0,
+    uniqueOpponents: r.unique_opponents
   }));
 
-  // Win rate first, then total wins as the tiebreaker (a 5-win 100% record
-  // outranks a 3-win 100% record), then games played, then name.
+  // Total wins first. Ties broken by games played (rewards showing up),
+  // then by unique opponents faced (rewards playing a wider pool of
+  // people over farming wins against the same one or two opponents),
+  // then name as a last resort for a genuine dead heat. Win rate is no
+  // longer part of the sort — it's still shown on the ladder, but a
+  // 1-game 100% record no longer outranks someone with a real track
+  // record.
   standings.sort((a, b) =>
-    b.winRate - a.winRate ||
     b.wins - a.wins ||
     b.gamesPlayed - a.gamesPlayed ||
+    b.uniqueOpponents - a.uniqueOpponents ||
     a.name.localeCompare(b.name)
   );
 
