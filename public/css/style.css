@@ -1,4 +1,4 @@
-/* WA Mini League — page-specific rules layered on top of theme.css, same
+/* Dream League (Mini Strategy Roper League) — page-specific rules layered on top of theme.css, same
    split the rest of dreamwa.re uses (shared chrome in theme.css, page
    styling alongside its own markup). Reuses the site's existing component
    conventions rather than inventing new ones: header.tool-header from the
@@ -18,13 +18,14 @@
    See .name-raw below. */
 
 /* --accent-3 is the site's second accent colour (bright CGA magenta),
-   layered on top of theme.css's cyan --accent-2. Deliberately scoped to
-   just one thing: a game's actual winner (.winner-tag, .wl-badge.w on the
-   standings page) — so it stays a recognisable "this is the result" signal
-   rather than a second general-purpose highlight. Cyan stays reserved for
-   ranking/aggregate stuff that already used it (ladder rank-1, qualified
-   badge, win streaks, active filter state); .dl-link uses --fg-bright
-   instead of either accent, since a plain reference link isn't a result. */
+   layered on top of theme.css's cyan --accent-2. Previously marked a
+   game's winner, but the games log deliberately doesn't call attention to
+   winners/losers anymore (see .victory-icon, a quiet fg-dim glyph
+   instead) — so --accent-3 is currently unclaimed, kept defined for a
+   future signal that actually warrants standing out. Cyan stays reserved
+   for ranking/aggregate stuff (ladder rank-1, activity-leader badge, win
+   streaks, active filter state); .dl-link uses --fg-bright instead of
+   either accent, since a plain reference link isn't a result. */
 :root { --panel-2: #0A0A0A; --err: #FF5555; --accent-3: #FF66FF; }
 
 body { font-size: 18px; min-height: 100vh; padding-bottom: 70px; }
@@ -36,6 +37,14 @@ body { font-size: 18px; min-height: 100vh; padding-bottom: 70px; }
    sets header-inner to 820px for the rest of the site; this project runs
    a bit wider). */
 .header-inner { max-width: 920px; }
+
+/* theme.css's .brand assumes a single inline name; this project stacks a
+   tagline underneath it (Dream League / Mini Strategy Roper League), so
+   swap the shared row's baseline alignment for a centered one against the
+   Æ mark. */
+.brand { align-items: center; }
+.brand-text { display: flex; flex-direction: column; gap: 1px; }
+.brand-tagline { font-size: 11px; letter-spacing: .06em; color: var(--fg-dim); text-transform: uppercase; }
 
 .name-raw { font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace; }
 
@@ -140,8 +149,8 @@ tr:hover td { background: var(--panel-2); }
 .gamecard .top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .gamecard .players { font-size: 16px; color: var(--fg-bright); }
 .gamecard .meta { font-size: 13.5px; color: var(--fg-dim); margin-top: 4px; }
-.winner-tag { color: var(--accent-3); }
 .draw-tag { color: var(--fg-dim); }
+.victory-icon { color: var(--fg-dim); font-size: 11px; vertical-align: 1px; }
 .unresolved-tag { color: var(--err); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .self-reported-tag { color: var(--fg-bright); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 
@@ -172,7 +181,7 @@ tr:hover td { background: var(--panel-2); }
 .subtle-hint { font-size: 14px; color: var(--fg-dim); margin: -10px 0 18px; }
 .subtle-hint b { color: var(--fg); font-weight: 400; }
 
-.updated-line { font-size: 13px; color: var(--fg-dim); margin: -14px 0 20px; }
+.updated-line { font-size: 12.5px; color: var(--fg-dim); white-space: nowrap; }
 .accent-2 { color: var(--accent-2); }
 
 /* ---- filter row: search + date grouping, shared look with .opt ---- */
@@ -202,8 +211,9 @@ tr:hover td { background: var(--panel-2); }
 .player-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 
 .played-badge { display: block; font-size: 12.5px; color: var(--fg-dim); margin-top: 3px; }
-.played-badge.qualified::before { content: '● '; color: var(--accent-2); font-size: 9px; }
-.played-badge.low-sample { color: var(--fg-dim); font-style: italic; }
+/* Marks the Most Active prize leader (games played × unique opponents),
+   not a sample-size indicator — see functions/api/standings.js. */
+.played-badge.activity-leader::before { content: '● '; color: var(--accent-2); font-size: 9px; }
 
 .streak { display: inline-flex; gap: 3px; }
 .streak span {
@@ -243,11 +253,6 @@ tr:hover td { background: var(--panel-2); }
   animation: fadeIn .15s ease;
 }
 .game-detail .gd-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
-.wl-badge {
-  display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px;
-  font-size: 11.5px; border: 1px solid var(--border-mid); color: var(--fg-dim); margin-right: 8px;
-}
-.wl-badge.w { color: var(--accent-3); border-color: var(--accent-3); }
 
 .dl-link { color: var(--fg-bright); text-decoration: none; border-bottom: 1px dotted var(--border-mid); font-size: 14px; }
 .dl-link:hover { border-bottom-style: solid; color: var(--accent-2); border-color: var(--accent-2); }

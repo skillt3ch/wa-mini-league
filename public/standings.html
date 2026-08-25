@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Standings | WA Mini League</title>
+<title>Standings | Dream League</title>
 <link href="https://fonts.cdnfonts.com/css/perfect-dos-vga-437" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,10 @@
   <div class="header-inner">
     <a class="brand" href="/">
       <span class="brand-mark">Æ</span>
-      <span class="brand-name">WA Mini League</span>
+      <span class="brand-text">
+        <span class="brand-name">Dream League</span>
+        <span class="brand-tagline">Mini Strategy Roper League</span>
+      </span>
     </a>
     <button id="reportBtn" class="opt small">Report an issue</button>
   </div>
@@ -26,15 +29,13 @@
 <div class="wrap">
   <header class="tool-header">
     <h1>Standings</h1>
-    <p>Ladder, ranked by win rate first and total wins as the tiebreaker, plus the full log of submitted games.</p>
+    <p>Two prizes: <b>Most Wins</b> takes the top ladder spot by total wins (ties broken by games played), and <b>Most Active</b> rewards facing the widest spread of opponents, scored as games played &times; unique opponents faced. The full game log sits below the ladder.</p>
   </header>
   <nav class="tab-bar">
     <a href="/">Submit</a>
     <a href="/standings.html" class="active">Standings</a>
     <a href="/admin.html" id="adminNavLink" hidden>Admin</a>
   </nav>
-
-  <div id="updatedLine" class="updated-line" hidden></div>
 
   <div class="filter-row">
     <input type="text" id="search" class="search-input" placeholder="Search player name...">
@@ -46,8 +47,7 @@
   </div>
 
   <section>
-    <div class="shead sticky"><h2>Ladder</h2><div class="rule"></div></div>
-    <p class="subtle-hint">Sorted by <b>win rate</b> first, <b>total wins</b> as the tiebreaker (a 5-win 100% record outranks a 3-win 100% record).</p>
+    <div class="shead sticky"><h2>Ladder</h2><div class="rule"></div><div id="updatedLine" class="updated-line" hidden></div></div>
     <div id="ladderWrap">
       <div class="loading-line">&gt; loading standings</div>
     </div>
@@ -89,8 +89,6 @@ function isThisWeek(iso) {
   const d = new Date(iso).getTime();
   return d >= Date.now() - 7 * 24 * 60 * 60 * 1000;
 }
-
-const QUALIFIED_THRESHOLD = 5;
 
 const ladderWrap = document.getElementById('ladderWrap');
 const gamesWrap = document.getElementById('gamesWrap');
@@ -153,26 +151,35 @@ function renderLadder() {
 
   ladderWrap.innerHTML = `
     <table id="ladder">
-      <thead><tr><th>#</th><th>Player</th><th>Streak</th><th>W-L</th><th>Win rate</th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th>Faced</th><th>Games</th><th>Diversity</th><th>Streak</th></tr></thead>
       <tbody>
         ${filtered.map(r => {
           const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
-          const qualified = r.gamesPlayed >= QUALIFIED_THRESHOLD;
+          const playedRelative = r.lastPlayedAt ? relativeTime(new Date(r.lastPlayedAt)) : 'never';
+          const playedTitle = r.lastPlayedAt ? new Date(r.lastPlayedAt).toLocaleString() : '';
+          // Diversity bar: opponents faced per game played. Can exceed 1
+          // in free-for-alls (one game can mean several opponents at
+          // once), so the bar clamps at 100% width but the raw fraction
+          // is always shown as text alongside it.
+          const diversityRatio = r.gamesPlayed > 0 ? r.uniqueOpponents / r.gamesPlayed : 0;
+          const diversityPct = Math.min(100, diversityRatio * 100);
           return `
           <tr class="${rankClass} fade-in">
             <td class="rank" data-label="#">${r.rank}</td>
             <td data-label="Player">
               <button class="player-link name-raw" data-id="${r.playerId}" data-name="${esc(r.name)}">${esc(r.name)}</button>
-              <span class="played-badge ${qualified ? 'qualified' : 'low-sample'}" title="${qualified ? 'Qualified sample size' : `Small sample (fewer than ${QUALIFIED_THRESHOLD} games)`}">${r.gamesPlayed} played</span>
+              <span class="played-badge ${r.isActivityLeader ? 'activity-leader' : ''}" title="${r.isActivityLeader ? 'Leading Most Active (games played × opponents faced)' : ''}${playedTitle}">played ${playedRelative}</span>
             </td>
-            <td data-label="Streak">${streakHtml(r.playerId)}</td>
-            <td data-label="W-L">${r.wins}-${r.losses}</td>
-            <td data-label="Win rate">
-              <div class="rate-cell">
-                <div class="rate-bar"><i style="width:${r.winRate}%"></i></div>
-                <span>${r.winRate}%</span>
+            <td data-label="Wins">${r.wins}</td>
+            <td data-label="Faced">${r.uniqueOpponents}</td>
+            <td data-label="Games">${r.gamesPlayed}</td>
+            <td data-label="Diversity">
+              <div class="rate-cell" title="${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'}">
+                <div class="rate-bar"><i style="width:${diversityPct}%"></i></div>
+                <span>${r.uniqueOpponents}/${r.gamesPlayed}</span>
               </div>
             </td>
+            <td data-label="Streak">${streakHtml(r.playerId)}</td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -241,9 +248,11 @@ function renderGames() {
     const resultTag = unresolved
       ? `<span class="unresolved-tag gr-meta">Needs review</span>`
       : g.isDraw ? `<span class="draw-tag gr-meta">Draw</span>` : '';
+    // Winner gets a small, quiet icon rather than a colour highlight —
+    // this section intentionally doesn't draw attention to who won/lost.
     const playersHtml = g.players.map(p => {
       const isWinner = !unresolved && !g.isDraw && p.playerId === g.winnerPlayerId;
-      return isWinner ? `<span class="winner-tag">${esc(p.playerName)}</span>` : esc(p.playerName);
+      return isWinner ? `${esc(p.playerName)} <span class="victory-icon" title="Winner">&#9733;</span>` : esc(p.playerName);
     }).join(' vs ');
     const row = `
       <button class="game-row fade-in" data-id="${g.id}" aria-expanded="${isExpanded}">
@@ -268,7 +277,7 @@ function renderGames() {
         <div class="gd-row"><span>Duration</span><span>${dur(g.durationSeconds)} &middot; ${g.turns} turns</span></div>
         ${g.players.map(p => `
           <div class="gd-row">
-            <span><span class="wl-badge ${!g.isDraw && !unresolved && p.playerId === g.winnerPlayerId ? 'w' : ''}">${unresolved ? '?' : g.isDraw ? 'D' : (p.playerId === g.winnerPlayerId ? 'W' : 'L')}</span><span class="name-raw">${esc(p.playerName)}</span></span>
+            <span class="name-raw">${esc(p.playerName)}</span>
             <span>${p.shots} shots &middot; ${p.turns} turns</span>
           </div>`).join('')}
         <div class="gd-row"><span>${provenance}</span><a class="dl-link" href="${g.replayDownloadUrl}">[&darr;] download replay</a></div>
@@ -340,9 +349,18 @@ async function load() {
     streaks = computeStreaks(games);
     renderLadder();
     renderGames();
-    lastUpdatedAt = new Date();
+    // "Last updated" reflects the last actual change to the ladder (the
+    // most recently submitted game), not when this browser tab happened
+    // to fetch — games aren't guaranteed to arrive sorted by submittedAt
+    // (the default sort is by played date), so scan for the max rather
+    // than trusting array order.
+    const latestSubmitted = games.reduce((max, g) => {
+      const t = g.submittedAt ? new Date(g.submittedAt).getTime() : 0;
+      return t > max ? t : max;
+    }, 0);
+    lastUpdatedAt = latestSubmitted > 0 ? new Date(latestSubmitted) : null;
     renderUpdatedLine();
-    updatedLine.hidden = false;
+    updatedLine.hidden = !lastUpdatedAt;
   } catch (ex) {
     ladderWrap.innerHTML = `<div class="err name-raw">Could not load standings.</div>`;
     gamesWrap.innerHTML = `<div class="err name-raw">Could not load games.</div>`;
