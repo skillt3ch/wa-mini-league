@@ -283,10 +283,19 @@ async function loadPanel() {
 const SOURCE_FILTER_LABELS = { wadb: 'WADB-verified', submitter: 'self-reported', manual: 'manually set' };
 
 function renderPanel() {
-  document.getElementById('gamesCount').textContent = `(${allGames.length})`;
-  if (!allGames.length) { panel.innerHTML = `<div class="hint">No games submitted yet.</div>`; document.getElementById('gamesPager').innerHTML = ''; return; }
+  const gamesCountEl = document.getElementById('gamesCount');
+  if (!allGames.length) {
+    gamesCountEl.textContent = '(0)';
+    panel.innerHTML = `<div class="hint">No games submitted yet.</div>`;
+    document.getElementById('gamesPager').innerHTML = '';
+    return;
+  }
 
   const filteredGames = sourceFilter === 'all' ? allGames : allGames.filter(g => g.winnerSource === sourceFilter);
+  // Show "filtered/total" once a filter narrows the list, so it's obvious
+  // at a glance both how many match and how many games exist overall —
+  // just "(5)" on its own wouldn't tell you 5 out of how many.
+  gamesCountEl.textContent = sourceFilter === 'all' ? `(${allGames.length})` : `(${filteredGames.length}/${allGames.length})`;
 
   if (!filteredGames.length) {
     panel.innerHTML = `<div class="hint">No ${SOURCE_FILTER_LABELS[sourceFilter] || ''} games.</div>`;
