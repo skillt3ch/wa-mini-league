@@ -3,6 +3,7 @@
 // IP is captured server-side and used for a light rate limit so this can't
 // be used to spam the admin panel.
 import { notifyDiscord, buildReportEmbed } from '../_discord.js';
+import { getClientIp } from '../_util.js';
 
 const CATEGORIES = new Set(['game_error', 'player', 'bug', 'other']);
 const MAX_MESSAGE_LEN = 2000;
@@ -24,7 +25,7 @@ export async function onRequestPost(context) {
     return Response.json({ error: `Keep it under ${MAX_MESSAGE_LEN} characters.` }, { status: 400 });
   }
 
-  const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || 'unknown';
+  const ip = getClientIp(request);
 
   const recent = await env.DB.prepare(
     `SELECT COUNT(*) AS count FROM reports WHERE ip_address = ? AND submitted_at >= datetime('now', ?)`

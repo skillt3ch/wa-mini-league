@@ -3,11 +3,11 @@ import { getGameAuditLog } from '../../../../_gameAudit.js';
 
 // GET /api/admin/games/:id/history — full audit trail for one game
 // (submission, admin edits, WADB rechecks), oldest first. Open to any
-// admin, but the IP address of whichever admin made each change is only
-// included for super admins. Regular admins get null for every entry's
-// adminIp — indistinguishable from a 'submitted' entry (which never has
-// one to begin with) — so there's no indication IP logging exists at all,
-// not just a withheld value.
+// admin, but the IP address behind each entry — the original submitter's,
+// same as an admin's edit or recheck — is only included for super admins.
+// Regular admins get null for every entry's adminIp, indistinguishable
+// from each other, so there's no indication IP logging exists at all, not
+// just a withheld value.
 export async function onRequestGet(context) {
   const { env, request, params } = context;
   if (!isAdmin(request, env)) return unauthorized();

@@ -35,6 +35,7 @@
 import { notifyDiscord, buildGameEmbed } from '../_discord.js';
 import { callWadb, resolveOutcome } from '../_wadb.js';
 import { logGameAudit } from '../_gameAudit.js';
+import { getClientIp } from '../_util.js';
 
 async function sha256Hex(buf) {
   const digest = await crypto.subtle.digest('SHA-256', buf);
@@ -197,11 +198,18 @@ export async function onRequestPost(context) {
   // First entry in this game's audit trail. actor is 'submitter' either way
   // (they're the one who filed the form) — winnerSource on the "after" side
   // is what tells you whether WADB verified it or the submitter picked it
-  // themselves after auto-verification failed.
+  // themselves after auto-verification failed. adminIp here holds the
+  // *submitter's* IP, not an admin's — the column/field name predates this
+  // and is generic in practice ("whoever's IP performed this logged
+  // action"); see the redaction note in functions/api/admin/games/[id]/
+  // history.js for why that's still fine to reuse. Captured for every
+  // submission, super-admin-only visibility, same as everywhere else IP
+  // data shows up in the admin panel.
   await logGameAudit(env, {
     gameId,
     action: 'submitted',
     actor: 'submitter',
+    adminIp: getClientIp(request),
     after: { winnerSource: outcome.winnerSource, winnerPlayerId: outcome.winnerPlayerId, isDraw: !!outcome.isDraw, outcomeStatus: outcome.outcomeStatus },
     note: outcome.note
   });

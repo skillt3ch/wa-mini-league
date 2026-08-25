@@ -5,6 +5,13 @@ import { toIsoUtc } from './_util.js';
 // admin-triggered WADB recheck (whether or not it actually changed
 // anything) — writes one row here. Nothing about a game's result changes
 // silently.
+//
+// admin_ip/adminIp is really "whoever's IP performed this logged action" —
+// the name predates it being used for the original submitter too, but every
+// caller (submit.js, admin PATCH, recheck) passes it the same way, and it's
+// redacted identically regardless of actor (see the super-admin-only gate
+// in functions/api/admin/games/[id]/history.js), so there's no need for a
+// separate field.
 
 // before/after are either null (no prior state, e.g. a brand-new
 // submission) or { winnerSource, winnerPlayerId, isDraw, outcomeStatus }.

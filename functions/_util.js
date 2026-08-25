@@ -15,3 +15,11 @@ export function toIsoUtc(dbTimestamp) {
   if (/[Zz]|[+-]\d\d:\d\d$/.test(dbTimestamp)) return dbTimestamp; // already unambiguous
   return dbTimestamp.replace(' ', 'T') + 'Z';
 }
+
+// Best-effort client IP for the current request, behind Cloudflare's proxy.
+// Shared by every endpoint that records "who did this" for accountability
+// (issue reports, admin edits/rechecks, game submissions) so the fallback
+// chain and 'unknown' sentinel stay consistent everywhere it's used.
+export function getClientIp(request) {
+  return request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || 'unknown';
+}

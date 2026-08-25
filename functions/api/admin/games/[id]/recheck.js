@@ -1,10 +1,7 @@
 import { isAdmin, unauthorized } from '../../../../_authAdmin.js';
 import { callWadb, resolveOutcome } from '../../../../_wadb.js';
 import { logGameAudit } from '../../../../_gameAudit.js';
-
-function adminIp(request) {
-  return request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || 'unknown';
-}
+import { getClientIp } from '../../../../_util.js';
 
 // POST /api/admin/games/:id/recheck — re-runs WADB's analyzeReplay against
 // the replay file already stored in R2 for this game (no re-upload
@@ -40,7 +37,7 @@ export async function onRequestPost(context) {
     isDraw: !!game.is_draw,
     outcomeStatus: game.outcome_status
   };
-  const ip = adminIp(request);
+  const ip = getClientIp(request);
 
   const wadbResult = await callWadb(bytes, game.replay_filename);
   if (!wadbResult.ok) {

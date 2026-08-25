@@ -1,9 +1,6 @@
 import { isAdmin, unauthorized } from '../../../_authAdmin.js';
 import { logGameAudit } from '../../../_gameAudit.js';
-
-function adminIp(request) {
-  return request.headers.get('CF-Connecting-IP') || request.headers.get('x-forwarded-for') || 'unknown';
-}
+import { getClientIp } from '../../../_util.js';
 
 // PATCH /api/admin/games/:id — edit winner / draw flag for a submission.
 // Body: { winnerPlayerId: number|null, isDraw: boolean }
@@ -48,7 +45,7 @@ export async function onRequestPatch(context) {
     gameId: id,
     action: 'winner_edit',
     actor: 'admin',
-    adminIp: adminIp(request),
+    adminIp: getClientIp(request),
     before: { winnerSource: game.winner_source, winnerPlayerId: game.winner_player_id, isDraw: !!game.is_draw, outcomeStatus: game.outcome_status },
     after: { winnerSource: 'manual', winnerPlayerId, isDraw, outcomeStatus }
   });
