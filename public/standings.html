@@ -154,6 +154,16 @@ function streakHtml(playerId) {
   ).join('')}</span>`;
 }
 
+// A player can hit a "perfect" 1.00x diversity ratio off a single game
+// against a single opponent — that's not meaningfully diverse, just a
+// small sample. Require at least this many games before the Most Active
+// leader's Diversity cell gets the magenta call-out, so an early/low-volume
+// tie doesn't get crowned alongside (or instead of) someone with a real
+// track record. isActivityLeader itself (games x opponents) already
+// suppresses most of this since low-volume players score low, but this is
+// a second, explicit floor for the visual highlight specifically.
+const MIN_GAMES_FOR_DIVERSITY_HIGHLIGHT = 5;
+
 function renderLadder() {
   if (!standings.length) {
     ladderWrap.innerHTML = `
@@ -194,18 +204,20 @@ function renderLadder() {
           const playedTitle = r.lastPlayedAt ? new Date(r.lastPlayedAt).toLocaleString() : '';
           const diversityRatio = r.gamesPlayed > 0 ? r.uniqueOpponents / r.gamesPlayed : 0;
           const diversityPct = maxDiversityRatio > 0 ? (diversityRatio / maxDiversityRatio) * 100 : 0;
+          const isDiversityLeader = r.isActivityLeader && r.gamesPlayed >= MIN_GAMES_FOR_DIVERSITY_HIGHLIGHT;
+          const diversityTitle = `${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'} (${diversityRatio.toFixed(2)}× — higher is more diverse)${isDiversityLeader ? ' — leading Most Active' : ''}`;
           return `
           <tr class="${rankClass} fade-in">
             <td class="rank" data-label="#">${r.rank}</td>
             <td data-label="Player">
               <button class="player-link name-raw" data-id="${r.playerId}" data-name="${esc(r.name)}">${esc(r.name)}</button>
-              <span class="played-badge ${r.isActivityLeader ? 'activity-leader' : ''}" title="${r.isActivityLeader ? 'Leading Most Active (games played × opponents faced)' : ''}${playedTitle}">played ${playedRelative}</span>
+              <span class="played-badge" title="${playedTitle}">played ${playedRelative}</span>
             </td>
             <td data-label="Wins">${r.wins}</td>
             <td data-label="Faced">${r.uniqueOpponents}</td>
             <td data-label="Games">${r.gamesPlayed}</td>
             <td data-label="Diversity">
-              <div class="rate-cell" title="${r.uniqueOpponents} opponent${r.uniqueOpponents === 1 ? '' : 's'} faced over ${r.gamesPlayed} game${r.gamesPlayed === 1 ? '' : 's'} (${diversityRatio.toFixed(2)}× — higher is more diverse)">
+              <div class="rate-cell${isDiversityLeader ? ' diversity-leader' : ''}" title="${diversityTitle}">
                 <div class="rate-bar"><i style="width:${diversityPct}%"></i></div>
                 <span>${diversityRatio.toFixed(2)}x</span>
               </div>

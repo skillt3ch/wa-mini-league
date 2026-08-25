@@ -18,15 +18,20 @@
    See .name-raw below. */
 
 /* --accent-3 is the site's second accent colour (bright CGA magenta),
-   layered on top of theme.css's cyan --accent-2. Scoped to one thing: a
-   game's winner (.winner-name) — but deliberately only in the expanded
-   game-detail view. The collapsed row stays quiet on purpose (a small
-   .victory-icon star, fg-dim, not a colour) so the log doesn't read as a
-   scoreboard at a glance; the magenta only shows up once you've opted in
-   by expanding a specific game. Cyan stays reserved for ranking/aggregate
-   stuff (ladder rank-1, activity-leader badge, win streaks, active filter
-   state); .dl-link uses --fg-bright instead of either accent, since a
-   plain reference link isn't a result. */
+   layered on top of theme.css's cyan --accent-2. Three scoped uses, none
+   of which overlap on screen at once:
+   - a game's winner (.winner-name), only in the expanded game-detail view
+     — the collapsed row stays quiet on purpose (a small .victory-icon
+     star, fg-dim, not a colour), so the log doesn't read as a scoreboard
+     at a glance; the magenta only shows up once you've opted in by
+     expanding a specific game.
+   - the submit page's dropzone (.drop) — the one actionable target there.
+   - the ladder's Diversity cell for the Most Active leader
+     (.rate-cell.diversity-leader), gated by a minimum games-played floor
+     so a fluke small-sample tie (e.g. a 1-game 1.00x) never gets crowned.
+   Cyan stays reserved for everything else ranking/aggregate on the ladder
+   (rank-1, win streaks, active filter state); .dl-link uses --fg-bright
+   instead of either accent, since a plain reference link isn't a result. */
 :root { --panel-2: #0A0A0A; --err: #FF5555; --accent-3: #FF66FF; }
 
 body { font-size: 18px; min-height: 100vh; padding-bottom: 70px; }
@@ -219,9 +224,6 @@ tr:hover td { background: var(--panel-2); }
 .player-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 
 .played-badge { display: block; font-size: 12.5px; color: var(--fg-dim); margin-top: 3px; }
-/* Marks the Most Active prize leader (games played × unique opponents),
-   not a sample-size indicator — see functions/api/standings.js. */
-.played-badge.activity-leader::before { content: '● '; color: var(--accent-2); font-size: 9px; }
 
 .streak { display: inline-flex; gap: 3px; }
 .streak span {
@@ -234,6 +236,11 @@ tr:hover td { background: var(--panel-2); }
 .rate-cell { display: flex; align-items: center; gap: 10px; }
 .rate-bar { width: 58px; height: 5px; background: var(--border-dim); position: relative; flex: none; }
 .rate-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-2); display: block; }
+/* Third meaning for --accent-3 (see the top-of-file note): the Most Active
+   prize leader's Diversity cell, gated in standings.html by a minimum
+   games-played floor so a 1-game 1.00x fluke never gets the highlight. */
+.rate-cell.diversity-leader .rate-bar i { background: var(--accent-3); }
+.rate-cell.diversity-leader span { color: var(--accent-3); }
 
 /* ---- games log: compact rows, expand on click ---- */
 .game-row {
