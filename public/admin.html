@@ -408,7 +408,7 @@ function historyStateLabel(state) {
 const HISTORY_SOURCE_LABELS = { wadb: 'verified via WADB', submitter: 'self-reported by submitter', manual: 'set by an admin' };
 
 function formatHistoryEntry(entry) {
-  const when = new Date(entry.createdAt.replace(' ', 'T') + 'Z').toLocaleString();
+  const when = new Date(entry.createdAt).toLocaleString();
   const ipTag = entry.adminIp ? ` | <span class="name-raw">IP ${ipLink(entry.adminIp)}</span>` : '';
 
   let headline;

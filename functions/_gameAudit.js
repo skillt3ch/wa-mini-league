@@ -1,3 +1,5 @@
+import { toIsoUtc } from './_util.js';
+
 // Shared audit-log helpers for games. Every change to a game's winner/
 // outcome — the original submission, an admin's manual correction, or an
 // admin-triggered WADB recheck (whether or not it actually changed
@@ -51,6 +53,6 @@ export async function getGameAuditLog(env, gameId) {
     old: { winnerSource: r.old_winner_source, winnerName: r.old_winner_name, isDraw: !!r.old_is_draw, outcomeStatus: r.old_outcome_status },
     new: { winnerSource: r.new_winner_source, winnerName: r.new_winner_name, isDraw: !!r.new_is_draw, outcomeStatus: r.new_outcome_status },
     note: r.note,
-    createdAt: r.created_at
+    createdAt: toIsoUtc(r.created_at)
   }));
 }

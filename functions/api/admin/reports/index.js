@@ -1,4 +1,5 @@
 import { isAdmin, isSuperAdmin, unauthorized } from '../../../_authAdmin.js';
+import { toIsoUtc } from '../../../_util.js';
 
 // GET /api/admin/reports — list every submitted report, open ones first
 // (newest first within each group). The reporter's IP is only included
@@ -23,7 +24,7 @@ export async function onRequestGet(context) {
     reporterName: r.reporter_name,
     ipAddress: canSeeIp ? r.ip_address : null,
     status: r.status,
-    submittedAt: r.submitted_at
+    submittedAt: toIsoUtc(r.submitted_at)
   }));
 
   return Response.json(out);

@@ -1,3 +1,5 @@
+import { toIsoUtc } from '../../_util.js';
+
 // GET /api/games — chronological list of submitted games, each with its
 // players, winner, and a download link for the stored replay.
 export async function onRequestGet(context) {
@@ -51,7 +53,7 @@ export async function onRequestGet(context) {
     wadbUrl: g.wadb_slug ? `https://wormsarmageddon.com/games/${g.wadb_slug}` : null,
     replayFilename: g.replay_filename,
     replayDownloadUrl: `/api/replay/${g.replay_hash}`,
-    submittedAt: g.submitted_at,
+    submittedAt: toIsoUtc(g.submitted_at),
     players: byGame[g.id] || []
   }));
 
