@@ -93,14 +93,18 @@ section { margin-top: 36px; }
 .pager-label { font-size: 13px; color: var(--fg-dim); }
 
 /* ---- dropzone (matches the Extract/Create tab dropzone styling) ---- */
+/* Magenta here is a second meaning for --accent-3, distinct from its
+   "this is a definitive result" use on standings.html — different page,
+   different job (marking the one actionable target on this page), not
+   ambiguous in practice since the two never appear together. */
 .drop {
-  border: 1px dashed var(--border-mid); background: var(--panel-2);
+  border: 1px dashed var(--accent-3); background: var(--panel-2);
   padding: 48px 24px; text-align: center; cursor: pointer; margin-bottom: 18px;
-  transition: border-color .15s, background .15s;
+  transition: border-color .15s, border-style .15s, background .15s;
 }
-.drop:hover, .drop.hot { border-color: var(--accent); background: var(--bg-raised); }
+.drop:hover, .drop.hot { border-style: solid; border-color: var(--accent-3); background: var(--bg-raised); }
 .drop .big { font-size: 18px; color: var(--fg-dim); letter-spacing: 0.5px; }
-.drop .big b { color: var(--fg-bright); }
+.drop .big b { color: var(--accent-3); font-weight: inherit; }
 .drop .sub { color: var(--fg-dim); font-size: 14px; margin-top: 10px; }
 #file { display: none; }
 
