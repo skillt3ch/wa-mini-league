@@ -146,7 +146,7 @@ function render() {
           style="display:${mapping[i].newName !== null ? 'inline-block' : 'none'}"
           value="${mapping[i].newName ? esc(mapping[i].newName) : esc(p.rawName)}">
       </div>
-      <div class="hint">team "<span class="name-raw">${esc(p.teamName)}</span>" | ${p.colour} | ${p.shots} shots | ${p.turns} turns</div>
+      <div class="hint">team "<span class="name-raw">${esc(p.teamName)}</span>" | ${p.colour} | ${p.turns} turns</div>
     </div>`;
   });
   html += `</section>

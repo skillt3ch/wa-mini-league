@@ -336,7 +336,7 @@ function renderGames() {
           return `
           <div class="gd-row">
             <span class="name-raw${isWinner ? ' winner-name' : ''}">${esc(p.playerName)}</span>
-            <span>${p.shots} shots | ${p.turns} turns</span>
+            <span>${p.turns} turns</span>
           </div>`;
         }).join('')}
         <div class="gd-row"><span>${provenance}</span><a class="dl-link" href="${g.replayDownloadUrl}">[&darr;] download replay</a></div>
