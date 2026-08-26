@@ -74,6 +74,14 @@ header.tool-header p {
   color: var(--fg-dim); margin: 0 0 20px; font-size: 16px;
   max-width: 700px; line-height: 1.55;
 }
+/* Small expansion of an acronym/abbreviation right under the h1 — same
+   quiet treatment as .brand-tagline in the site header, just scoped to
+   whichever page needs it (currently just /scheme.html's "SRoper =
+   Strategic Roper"). */
+header.tool-header p.page-subtitle {
+  font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--fg-dim); margin: -4px 0 10px; max-width: none;
+}
 /* ---- top-level page nav, styled like the Extract/Create tab bar ---- */
 .tab-bar { display: flex; gap: 10px; margin-bottom: 34px; flex-wrap: wrap; }
 .tab-bar a {
