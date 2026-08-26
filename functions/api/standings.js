@@ -6,9 +6,9 @@
 // resolved, so a stuck game doesn't silently deflate anyone's record.
 //
 // Two separate prizes live here, deliberately kept independent:
-//   - Most Wins: the ladder's rank order (total wins, ties broken by
-//     games played, then name). Unique opponents plays no part in the
-//     ladder rank itself.
+//   - Most Wins: the ladder's rank order (total wins, ties broken by win
+//     rate, then name). Unique opponents plays no part in the ladder rank
+//     itself.
 //   - Most Active: a standalone Activity Score = gamesPlayed *
 //     uniqueOpponents, rewarding a wide spread of opponents over farming
 //     the same one or two people. isActivityLeader flags whoever holds
@@ -64,14 +64,13 @@ export async function onRequestGet(context) {
     diversityRatio: r.games_played > 0 ? +(r.unique_opponents / r.games_played).toFixed(4) : 0
   }));
 
-  // Most Wins ranking: total wins first, games played as the tiebreaker
-  // (rewards showing up), then name as a last resort for a genuine dead
-  // heat. Win rate and unique opponents play no part in this sort — a
-  // 1-game 100% record no longer outranks someone with a real track
-  // record, and opponent diversity is scored separately as Most Active.
+  // Most Wins ranking: total wins first, win rate as the tiebreaker
+  // (rewards efficiency over volume when wins are tied), then name as a
+  // last resort for a genuine dead heat. Unique opponents plays no part in
+  // this sort — that's scored separately as Most Active.
   standings.sort((a, b) =>
     b.wins - a.wins ||
-    b.gamesPlayed - a.gamesPlayed ||
+    b.winRate - a.winRate ||
     a.name.localeCompare(b.name)
   );
 
