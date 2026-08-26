@@ -147,12 +147,33 @@ select, input[type=text], input[type=password] {
 /* Only spaces out *consecutive* sections, so index.html's single
    .scheme-section (no sibling) is unaffected. */
 .scheme-section + .scheme-section { margin-top: 30px; }
-.info-row { padding: 9px 0; border-top: 1px solid var(--border-dim); line-height: 1.5; }
+/* This page is mostly long-form paragraphs rather than the short UI labels
+   the DOS bitmap font was chosen for — at paragraph length its fixed,
+   heavy stroke width reads as uniformly bold no matter the actual
+   font-weight. Headings stay in the DOS font (still short, still fine);
+   body copy switches to JetBrains Mono, same font already used wherever
+   the site needs normal-weight, easily-readable text (.name-raw). */
+.scheme-section p,
+.scheme-section .info-row,
+.scheme-section .tip-row,
+.scheme-section .hint {
+  font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  font-weight: 400;
+  line-height: 1.7;
+}
+.info-row { padding: 9px 0; border-top: 1px solid var(--border-dim); }
 .info-row:first-child { border-top: none; padding-top: 0; }
-.tip-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--border-dim); line-height: 1.5; }
+.tip-row {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 10px 0; border-top: 1px solid var(--border-dim);
+}
 .tip-row:first-child { border-top: none; padding-top: 0; }
-.tip-num { color: var(--accent-2); font-weight: 600; flex: none; width: 20px; }
-.scheme-video { width: 100%; max-width: 720px; display: block; background: #000; margin-bottom: 10px; }
+.tip-num { color: var(--accent-2); font-weight: 600; flex: none; width: 20px; margin-right: 2px; }
+/* Sized to the available column (.wrap caps content at 920px) rather than
+   an arbitrary fixed width, and capped by viewport height so a
+   high-resolution recording can never force the page itself to scroll
+   just to reveal the player controls. */
+.scheme-video { width: 100%; max-height: 60vh; display: block; background: #000; object-fit: contain; margin-bottom: 10px; }
 
 /* ---- buttons: same conventions as the Create tab's export/reset buttons ---- */
 .opts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
