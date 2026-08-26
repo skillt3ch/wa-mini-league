@@ -183,7 +183,7 @@ function renderLadder() {
 
   ladderWrap.innerHTML = `
     <table id="ladder">
-      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th title="Percentage of games won — the Most Wins tiebreaker when total wins are equal">Win %</th><th title="Number of different opponents this player has faced across all their games">Faced</th><th>Games</th><th title="Opponents faced per game played, as a percentage — can exceed 100% in free-for-all games">Diversity</th><th title="Games played × unique opponents faced — the score behind the Most Active prize">Activity</th><th>Streak</th></tr></thead>
+      <thead><tr><th>#</th><th>Player</th><th>Wins</th><th title="Percentage of games won — the Most Wins tiebreaker when total wins are equal">Win %</th><th title="Number of different opponents this player has faced across all their games">Faced</th><th>Games</th><th title="Opponents faced per game played, as a percentage">Diversity</th><th title="Games played × unique opponents faced — the score behind the Most Active prize">Activity</th><th>Streak</th></tr></thead>
       <tbody>
         ${filtered.map(r => {
           const rankClass = r.rank <= 3 ? `rank-${r.rank}` : '';
