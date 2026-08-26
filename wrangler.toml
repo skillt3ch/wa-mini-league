@@ -16,5 +16,13 @@ database_id = "7d02c358-61c3-4d18-af33-71af7b024f56"
 binding = "REPLAYS"
 bucket_name = "wa-mini-league-replays"
 
+# R2 bucket for public site media (currently just the SRoper explainer
+# video) — separate from REPLAYS since this holds promotional/reference
+# content rather than user-submitted gameplay evidence. Create with:
+#   npx wrangler r2 bucket create wa-mini-league-media
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "wa-mini-league-media"
+
 # Admin password is set as a secret, NOT here. Run:
 #   npx wrangler pages secret put ADMIN_PASSWORD

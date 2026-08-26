@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The SRoper Scheme | Dream League</title>
+<link href="https://fonts.cdnfonts.com/css/perfect-dos-vga-437" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark">Æ</span>
+      <span class="brand-text">
+        <span class="brand-name">Dream League</span>
+        <span class="brand-tagline">Mini Strategy Roper League</span>
+      </span>
+    </a>
+    <button id="reportBtn" class="opt small">Report an issue</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <header class="tool-header">
+    <h1>The SRoper Scheme</h1>
+    <p>What this league's scheme changes about standard Roper, why it plays differently, and how to think about crates once there's only ever one on the map at a time.</p>
+  </header>
+  <nav class="tab-bar">
+    <a href="/">Submit</a>
+    <a href="/standings.html">Standings</a>
+    <a href="/admin.html" id="adminNavLink" hidden>Admin</a>
+  </nav>
+
+  <section class="scheme-section">
+    <div class="shead"><h2>The pitch</h2><div class="rule"></div></div>
+    <div class="card">
+      <p style="margin:0;">Standard Roper's biggest complaint is that a match can hinge on pure luck: whichever player happens to be closer to a crate when it lands often just wins the exchange, regardless of skill. SRoper keeps the core roping gameplay intact but reworks how crates spawn, turning "who gets the crate" from a dice roll into a genuine positioning contest - one you can actually get better at.</p>
+    </div>
+  </section>
+
+  <section class="scheme-section">
+    <div class="shead"><h2>What's different</h2><div class="rule"></div></div>
+    <div class="card">
+      <div class="info-row"><span class="name-raw" style="color:var(--fg-bright);">Crate spawns:</span> a new crate spawns every few seconds, but never more than one is live on the map at once - instead of a batch landing all at once.</div>
+      <div class="info-row"><span class="name-raw" style="color:var(--fg-bright);">Crate HP bonus:</span> reduced to 10 (was 20) - a crate can still turn a fight, but it's less of an instant win.</div>
+      <div class="info-row"><span class="name-raw" style="color:var(--fg-bright);">Bazooka on turn 1:</span> now optional (was mandatory).</div>
+      <div class="info-row">Everything else is unchanged from standard Roper.</div>
+    </div>
+    <div class="hint">Since there's only ever one crate in play, camping the high ground stops being a free win: it denies your opponent the current crate, but it also means giving up any crate you can't personally reach. A wider variety of hides come into play as both players jockey for position ahead of the next spawn - reading your opponent's habits and skill matters as much as your own aim.</div>
+  </section>
+
+  <section class="scheme-section">
+    <div class="shead"><h2>Scheme &amp; maps</h2><div class="rule"></div></div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="name-raw" style="font-size:16px; color:var(--fg-bright);">Strategy Roper</div>
+          <div class="hint">The league's scheme: load it into Worms Armageddon before playing a game.</div>
+        </div>
+        <a class="opt small" href="/downloads/strategy-roper.wsc" download>Download scheme</a>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px;">
+      <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="name-raw" style="font-size:16px; color:var(--fg-bright);">sRoper Pack</div>
+          <div class="hint">10 custom maps built for this scheme.</div>
+        </div>
+        <a class="opt small" href="/downloads/sroper-map-pack.zip" download>Download map pack</a>
+      </div>
+    </div>
+    <div class="hint">SRoper plays best on maps with land on both sides of the island, not just a single central mass - crates need somewhere to spawn besides the middle. The map pack above is built for that; the scheme also works fine on regular Roper maps if that's what you've got.</div>
+  </section>
+
+  <section class="scheme-section">
+    <div class="shead"><h2>Tips</h2><div class="rule"></div></div>
+    <div class="card">
+      <div class="tip-row"><span class="tip-num">1</span><span>Prioritize your attack. Play it like standard Roper first: get one crate, then land a hit. Picking up a second crate on the way back is a bonus - never the goal.</span></div>
+      <div class="tip-row"><span class="tip-num">2</span><span>Read the board when a crate spawns. Look for the hide that maximizes the distance between you, your opponent, and the crate - sometimes that's dead center of the map.</span></div>
+      <div class="tip-row"><span class="tip-num">3</span><span>It's fine to abandon a hard crate. Since only one is ever live, you can leave a difficult one for your opponent rather than risk your whole turn chasing it. If a turn only works with a perfect run, try it - but bail the moment something goes wrong.</span></div>
+      <div class="tip-row"><span class="tip-num">4</span><span>Don't burn a turn on an easy crate alone. If a crate's an easy grab, collect it on your way to your real attack - but never spend a whole turn just to deny your opponent an easy one.</span></div>
+      <div class="tip-row"><span class="tip-num">5</span><span>Sometimes the right move is repositioning, not reaching. If a crate's out of both players' realistic range, rope closer while staying outside your opponent's range - forcing them to either commit to a risky attempt or let you close the gap first.</span></div>
+    </div>
+  </section>
+
+  <section class="scheme-section">
+    <div class="shead"><h2>Video walkthrough</h2><div class="rule"></div></div>
+    <div class="card">
+      <p class="hint" style="margin-top:0;">~10 minutes, played by the scheme's designer against himself, with commentary.</p>
+      <video class="scheme-video" controls preload="metadata" playsinline>
+        <source src="/api/media/sroper-showcase.mp4" type="video/mp4">
+      </video>
+      <a class="dl-link" href="/api/media/sroper-showcase.mp4" download>download video</a>
+    </div>
+  </section>
+</div>
+
+<script type="module" src="/js/report.js"></script>
+<script type="module" src="/js/adminNav.js"></script>
+</body>
+</html>

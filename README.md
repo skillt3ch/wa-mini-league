@@ -2,15 +2,16 @@
 
 *(Mini Strategy Roper League — internally still referred to by the older "WA Mini League" name in a few places: the repo folder, the D1 database name, `package.json`. Renaming those touches live infrastructure identifiers, so they're left alone unless you want that changed too.)*
 
-A tiny 3-page site for tracking a Worms Armageddon mini-league from `.WAgame` replays:
+A tiny 4-page site for tracking a Worms Armageddon mini-league from `.WAgame` replays:
 
-- **`/`** — drop a replay, confirm/map the detected player names, submit. The winner is verified automatically — nothing to pick, unless auto-verification fails, in which case you're prompted to pick the winner yourself so the game still gets recorded. Results go live immediately. Below the drop zone: the league's scheme (`Strategy Roper`) and map pack, both downloadable.
+- **`/`** — drop a replay, confirm/map the detected player names, submit. The winner is verified automatically — nothing to pick, unless auto-verification fails, in which case you're prompted to pick the winner yourself so the game still gets recorded. Results go live immediately. Below the drop zone: the league's scheme (`Strategy Roper`) and map pack, both downloadable, plus a link to the full scheme explainer.
+- **`/scheme.html`** — what SRoper is, how it differs from standard Roper, map recommendations, strategy tips, and a self-hosted video walkthrough. Linked from the homepage's Scheme & Maps card; not in the main nav, since it's reference material rather than a task.
 - **`/standings.html`** — the ladder, plus a log of every submitted game with a replay download link and a provenance note (WADB-verified, self-reported, or set by an admin). Two independent prizes live here — see below. If you're logged in as an admin (in this browser tab), expanding a game also shows a Delete button here — no need to jump to `/admin.html` just to remove a bad submission.
 - **`/admin.html`** — password-gated panel to fix a winner, resolve a game the auto-verification couldn't determine, delete a bad submission, merge/delete duplicate player records, review submitted issue reports, or re-run WADB verification on a stored replay. Every result change is logged with who changed it and when — see the audit trail note below. Logging in here is also what makes the "Admin" tab appear in the nav bar on every page in this browser tab — see below.
 
 Every page also has a **Report an issue** button in the header — anyone can flag a disputed result, bad behaviour, or a site bug without logging in; only admins can see the list.
 
-Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API, D1 (SQLite) for data, R2 for storing the uploaded replay files.
+Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API, D1 (SQLite) for data, R2 for storing both the uploaded replay files and (separately) public site media like the scheme's video walkthrough.
 
 ## How it works
 
@@ -37,6 +38,7 @@ Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API
 - **Branding**: the site is "Dream League" (tagline "Mini Strategy Roper League") in the header/`<title>` on all three pages (`.brand-text`/`.brand-tagline` in `public/css/style.css`) — matching the Æ mark dreamwa.re itself uses. Internal identifiers (repo folder, D1 database name `wa-mini-league-db`, `package.json`'s `name`) are still the older "wa-mini-league" name; renaming those touches live infrastructure and wasn't done as part of this pass.
 - **Timestamp normalization**: D1's `datetime('now')` (used for `submitted_at`, `created_at`, etc.) stores a bare `"YYYY-MM-DD HH:MM:SS"` string — no `T`, no `Z`, no timezone marker. Browsers commonly parse that shape as *local* time rather than UTC, which silently shifted every relative-time display ("Last updated Xh ago", a player's "last played") by the viewer's UTC offset — someone west of UTC would see recent activity reported as further in the past than it actually was. `functions/_util.js`'s `toIsoUtc()` normalizes any such value into an unambiguous ISO string before it's returned from an API endpoint, so the frontend never has to special-case the format; it's applied in `functions/api/games/index.js`, `functions/api/standings.js`, `functions/api/admin/reports/index.js`, and `functions/_gameAudit.js`. `functions/api/standings.js`'s `last_played_at` had a second, related bug: it took `MAX(COALESCE(played_at, submitted_at))` in SQL, but `played_at` (client-supplied, full ISO with milliseconds) and `submitted_at` (D1's bare format) are different string shapes for the same instant, so a plain string `MAX()` across the two wasn't reliably chronological — fixed by comparing `strftime('%s', ...)` (actual parsed UTC seconds) instead of the raw strings.
 - **Scheme & map downloads**: `public/index.html` has a "Scheme & Maps" section below the drop zone linking to `public/downloads/strategy-roper.wsc` (the league's scheme) and `public/downloads/sroper-map-pack.zip` (10 custom maps). These are static files served straight from Pages — no API involved, no admin control over them yet. `public/downloads/sroper-maps.zip` is a leftover first copy of the map pack (contains macOS resource-fork clutter, `__MACOSX/`) that isn't linked from anywhere; safe to delete whenever someone approves it.
+- **The SRoper explainer (`/scheme.html`)**: the pitch, the 3 rule changes (continuous one-at-a-time crate spawns, crate HP bonus 20→10, optional turn-1 bazooka), map recommendations, 5 strategy tips, and a video walkthrough — rewritten into the site's own voice from the league organiser's original announcement, not reproduced verbatim. Linked from the homepage's Scheme & Maps card ("What is SRoper, and how do I play it?"), not from the main nav — it's a reference page, not one of the three task flows. The video is served from a **second, separate R2 bucket** (`wa-mini-league-media`, binding `MEDIA`) rather than as a static Pages asset: at ~200MB it's well over [Cloudflare Pages' 25MB-per-file limit](https://developers.cloudflare.com/workers/platform/limits/), which the small scheme/map-pack downloads never hit. `functions/api/media/[key].js` streams it back (public, no admin password needed — it's promotional content, not gameplay evidence) and explicitly handles HTTP Range requests (`env.MEDIA.get(key, { range: request.headers })`, responding `206` with a matching `Content-Range` when one's present) so the `<video>` player on the page can seek/scrub instead of buffering the whole file first. See the setup section for how to create the bucket and upload the video — that step has to be run from your own machine (Cloudflare credentials aren't available in this environment).
 
 ## Setup
 
@@ -56,13 +58,20 @@ Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API
    npx wrangler r2 bucket create wa-mini-league-replays
    ```
 
-4. Run the schema migration:
+4. Create the R2 bucket for public site media, then upload the scheme's video walkthrough into it (run this from wherever the video file actually lives on your machine — it's too large for this environment to upload on your behalf):
+   ```
+   npx wrangler r2 bucket create wa-mini-league-media
+   npx wrangler r2 object put wa-mini-league-media/media/sroper-showcase.mp4 --file="/path/to/Sroper Showcase.mp4" --content-type=video/mp4 --remote
+   ```
+   The key (`media/sroper-showcase.mp4`) has to match what `/scheme.html` requests (`/api/media/sroper-showcase.mp4`) — if you ever swap in a different video, either reuse this same key or update both the filename in `functions/api/media/[key].js`'s callers and the `<source>` URL in `public/scheme.html`.
+
+5. Run the schema migration:
    ```
    npm run db:migrate:remote
    ```
    (use `db:migrate:local` first if you want to test with `wrangler pages dev` locally)
 
-5. Set the admin password as a secret (never commit this):
+6. Set the admin password as a secret (never commit this):
    ```
    npx wrangler pages secret put ADMIN_PASSWORD
    ```
@@ -72,7 +81,7 @@ Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API
    npx wrangler pages secret put SUPER_ADMIN_PASSWORD
    ```
 
-6. (Optional) Discord notifications — needs a real Discord *server* (incoming webhooks can't post to a group DM). In your server:
+7. (Optional) Discord notifications — needs a real Discord *server* (incoming webhooks can't post to a group DM). In your server:
    - Create two channels (e.g. `#game-log` and `#reports`), each with its own webhook: channel settings (or Server Settings → Integrations → Webhooks) → New Webhook → Copy Webhook URL.
    - If you want issue reports to @-mention a role, enable Developer Mode (User Settings → Advanced) so you can right-click the role and Copy ID.
    - Set whichever of these you want as secrets — any left unset just means that notification type is silently skipped:
@@ -83,7 +92,7 @@ Runs entirely on Cloudflare Pages: static frontend + Pages Functions for the API
      ```
    - To switch servers/channels later, just overwrite the secret with a new webhook URL (or role ID) — no code changes needed.
 
-7. Deploy:
+8. Deploy:
    ```
    npm run deploy
    ```
