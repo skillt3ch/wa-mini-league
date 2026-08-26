@@ -20,11 +20,9 @@
 /* --accent-3 is the site's second accent colour (bright CGA magenta),
    layered on top of theme.css's cyan --accent-2. Four scoped uses, none
    of which overlap on screen at once:
-   - a game's winner (.winner-name), only in the expanded game-detail view
-     — the collapsed row stays quiet on purpose (a small .victory-icon
-     star, fg-dim, not a colour), so the log doesn't read as a scoreboard
-     at a glance; the magenta only shows up once you've opted in by
-     expanding a specific game.
+   - a game's winner (.winner-name), in both the collapsed games-log row
+     and the expanded detail — the clearest, most direct way to show who
+     won, used in place of an earlier icon-only treatment.
    - the submit page's dropzone (.drop) — the one actionable target there.
    - the ladder's Wins cell for the Most Wins prize leader (td.wins-leader)
      — rank 1 on the ladder is that leader by definition, guarded only
@@ -210,9 +208,8 @@ tr:hover td { background: var(--panel-2); }
 .gamecard .players { font-size: 16px; color: var(--fg-bright); }
 .gamecard .meta { font-size: 13.5px; color: var(--fg-dim); margin-top: 4px; }
 .draw-tag { color: var(--fg-dim); }
-.victory-icon { color: var(--fg-dim); font-size: 11px; vertical-align: 1px; font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace; }
-/* Winner gets the magenta treatment only once expanded — the collapsed
-   row stays quiet with just .victory-icon's star. */
+/* Winner gets the magenta treatment everywhere their name appears in the
+   games log — both the collapsed row and the expanded detail. */
 .winner-name { color: var(--accent-3); }
 .unresolved-tag { color: var(--err); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }
 .self-reported-tag { color: var(--fg-bright); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; }

@@ -304,11 +304,9 @@ function renderGames() {
     const resultTag = unresolved
       ? `<span class="unresolved-tag gr-meta">Needs review</span>`
       : g.isDraw ? `<span class="draw-tag gr-meta">Draw</span>` : '';
-    // Winner gets a small, quiet icon rather than a colour highlight —
-    // this section intentionally doesn't draw attention to who won/lost.
     const playersHtml = g.players.map(p => {
       const isWinner = !unresolved && !g.isDraw && p.playerId === g.winnerPlayerId;
-      return isWinner ? `${esc(p.playerName)} <span class="victory-icon" title="Winner">&#9733;</span>` : esc(p.playerName);
+      return isWinner ? `<span class="winner-name">${esc(p.playerName)}</span>` : esc(p.playerName);
     }).join(' vs ');
     const row = `
       <button class="game-row fade-in" data-id="${g.id}" aria-expanded="${isExpanded}">
