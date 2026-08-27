@@ -9,8 +9,17 @@
 // same engine analysis but is public/unauthenticated and doesn't persist
 // anything on WADB's end (no stored replay, no public game page). That's
 // fine for us: we already store our own copy of the replay in R2
-// regardless, we only ever needed the winner. It does mean there's no
-// WADB page to link to, so we don't request/store an id or slug here.
+// regardless. It does mean there's no WADB page to link to, so we don't
+// request/store an id or slug here.
+//
+// Also used, since it's already being called anyway, to cross-check team
+// identity: WADB resolves each team's actual controlling player itself
+// (engine-side), which is more trustworthy than the local .WAgame parser's
+// byte-signature heuristic for exactly the case that heuristic struggles
+// with — a spectator getting mis-attributed as a team's owner. Any
+// disagreement is corrected in `players` before it's ever written to the
+// DB (see applyWadbIdentityCorrections in ../_wadb.js) and logged to
+// parser_discrepancies for later analysis.
 //
 // Two-pass flow when WADB can't determine a winner: the first request (no
 // manualWinner field) tries WADB; if it comes back unresolved, nothing is
@@ -26,14 +35,17 @@
 //   meta         - JSON: { playedAt, mapType, durationSeconds, turns, version }
 //   players      - JSON array in team order:
 //                    [{ rawName, teamName, colour, shots, turns,
-//                       playerId?: number, newPlayerName?: string }]
-//                  exactly one of playerId / newPlayerName must be set per entry
+//                       playerId?: number, newPlayerName?: string,
+//                       identityUncertain?: boolean }]
+//                  exactly one of playerId / newPlayerName must be set per entry.
+//                  identityUncertain (from parser.js) is only used for the
+//                  parser_discrepancies log below, not for resolution.
 //   manualWinner - optional JSON: { isDraw: boolean, rawIndex: number|null }
 //                  rawIndex is an index into the players array above; only
 //                  sent on the resubmit after a needsManualWinner response
 
 import { notifyDiscord, buildGameEmbed } from '../_discord.js';
-import { callWadb, resolveOutcome } from '../_wadb.js';
+import { callWadb, resolveOutcome, applyWadbIdentityCorrections } from '../_wadb.js';
 import { logGameAudit } from '../_gameAudit.js';
 import { getClientIp } from '../_util.js';
 
@@ -88,9 +100,28 @@ export async function onRequestPost(context) {
     );
   }
 
+  // Ask WADB up front — before resolving any player_id below — so any
+  // team<->player identity discrepancy it reveals corrects `players` in
+  // place first. Doing this before player resolution (rather than after,
+  // where the WADB call used to happen) matters: otherwise a locally
+  // mis-attributed raw name — e.g. a spectator's name, or a team's own
+  // fantasy name when the parser flagged it uncertain — would already have
+  // created or aliased a player record for the WRONG identity by the time
+  // we found out WADB disagreed. Skipped entirely on the manualWinner
+  // resubmit pass, same as the actual winner lookup further down — WADB
+  // already had its say on the first pass for this exact replay.
+  let wadbResult = null, wadbCorrections = [];
+  if (!manualWinner) {
+    wadbResult = await callWadb(bytes, file.name);
+    if (wadbResult.ok) wadbCorrections = await applyWadbIdentityCorrections(env, players, wadbResult.game);
+  }
+
   // Resolve each player entry to a player_id, creating new players/aliases
   // as needed. Every raw in-game name gets recorded as an alias so future
-  // submissions with the same variant auto-suggest correctly.
+  // submissions with the same variant auto-suggest correctly. Runs against
+  // the WADB-corrected `players` array above when applicable, so a
+  // corrected identity is what actually gets created/credited — not the
+  // (possibly wrong) locally-parsed one.
   const resolvedPlayerIds = [];
   for (const p of players) {
     let playerId = p.playerId ? Number(p.playerId) : null;
@@ -135,10 +166,10 @@ export async function onRequestPost(context) {
       outcome = { outcomeStatus: 'confirmed', winnerSource: 'submitter', winnerPlayerId, isDraw: 0, note: null };
     }
   } else {
-    // Ask WADB who actually won. This never blocks the submission — if it
-    // fails or can't be resolved, nothing is saved yet; the response tells
-    // the client to prompt for a manual winner instead.
-    const wadbResult = await callWadb(bytes, file.name);
+    // wadbResult was already fetched above (before player resolution) so
+    // the identity corrections could apply first. This never blocks the
+    // submission — if it fails or can't be resolved, nothing is saved yet;
+    // the response tells the client to prompt for a manual winner instead.
     outcome = { outcomeStatus: 'unresolved', winnerSource: null, winnerPlayerId: null, isDraw: 0, note: wadbResult.ok ? null : wadbResult.reason };
     if (wadbResult.ok) {
       outcome = resolveOutcome(wadbResult.game, players, resolvedPlayerIds);
@@ -214,6 +245,26 @@ export async function onRequestPost(context) {
     note: outcome.note
   });
 
+  // One row per WADB-corrected identity, purely as data to look back over
+  // later (see migrations/0006_parser_discrepancies.sql) — plus a single
+  // audit-log entry so it's visible in this game's own History panel too,
+  // same place every other change to this game shows up.
+  if (wadbCorrections.length) {
+    for (const c of wadbCorrections) {
+      await env.DB.prepare(`
+        INSERT INTO parser_discrepancies
+          (game_id, colour, local_raw_name, local_identity_uncertain, wadb_player_name, wadb_is_spectator, wadb_is_host)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(gameId, c.colour, c.oldName, c.wasUncertain ? 1 : 0, c.newName, c.wadbSpectator ? 1 : 0, c.wadbHost ? 1 : 0).run();
+    }
+    await logGameAudit(env, {
+      gameId,
+      action: 'identity_corrected',
+      actor: 'system',
+      note: wadbCorrections.map(c => `${c.colour}: "${c.oldName}"${c.wasUncertain ? ' (parser unsure)' : ''} -> "${c.newName}" (WADB)`).join('; ')
+    });
+  }
+
   // Fire-and-forget: notify the games Discord channel without delaying the
   // response to the submitter.
   context.waitUntil(notifyDiscord(
@@ -230,6 +281,7 @@ export async function onRequestPost(context) {
     outcomeStatus: outcome.outcomeStatus,
     winnerName,
     winnerSource: outcome.winnerSource,
-    wadbNote: outcome.note
+    wadbNote: outcome.note,
+    identityCorrections: wadbCorrections.length
   });
 }

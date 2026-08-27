@@ -467,6 +467,8 @@ function formatHistoryEntry(entry) {
     headline = changed
       ? `Admin re-checked WADB — updated: ${historyStateLabel(entry.old)} -&gt; ${historyStateLabel(entry.new)}`
       : `Admin re-checked WADB — no change (${historyStateLabel(entry.new)})`;
+  } else if (entry.action === 'identity_corrected') {
+    headline = 'WADB corrected a player identity the local parser had wrong';
   } else {
     headline = entry.action;
   }

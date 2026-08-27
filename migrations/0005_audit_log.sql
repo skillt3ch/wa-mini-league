@@ -8,8 +8,8 @@
 CREATE TABLE IF NOT EXISTS game_audit_log (
   id                     INTEGER PRIMARY KEY AUTOINCREMENT,
   game_id                INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-  action                 TEXT NOT NULL,   -- 'submitted' | 'winner_edit' | 'wadb_recheck'
-  actor                  TEXT NOT NULL,   -- 'submitter' | 'admin'
+  action                 TEXT NOT NULL,   -- 'submitted' | 'winner_edit' | 'wadb_recheck' | 'identity_corrected'
+  actor                  TEXT NOT NULL,   -- 'submitter' | 'admin' | 'system'
   admin_ip               TEXT,            -- IP of the admin who made the change (NULL for 'submitted')
   old_winner_source      TEXT,
   old_winner_player_id   INTEGER REFERENCES players(id),

@@ -176,7 +176,7 @@ function render() {
           value="${mapping[i].newName ? esc(mapping[i].newName) : esc(p.rawName)}">
       </div>
       <div class="hint">team "<span class="name-raw">${esc(p.teamName)}</span>" | ${p.colour} | ${p.turns} turns</div>
-      ${p.identityUncertain ? `<div class="hint err name-raw">Couldn't automatically tell who controlled this team (this can happen when a spectator was in the game) — please select or type the correct player above.</div>` : ''}
+      ${p.identityUncertain ? `<div class="hint err name-raw">Couldn't automatically tell who controlled this team locally (this can happen when a spectator was in the game) — it'll usually be corrected automatically once WADB verifies the winner, but feel free to select or type the correct player above too, just in case.</div>` : ''}
     </div>`;
   });
   html += `</section>
@@ -226,7 +226,8 @@ function buildSubmitFormData(manualWinner) {
     shots: p.shots,
     turns: p.turns,
     playerId: mapping[i].playerId,
-    newPlayerName: mapping[i].newName
+    newPlayerName: mapping[i].newName,
+    identityUncertain: !!p.identityUncertain
   }))));
   if (manualWinner) fd.append('manualWinner', JSON.stringify(manualWinner));
   return fd;
