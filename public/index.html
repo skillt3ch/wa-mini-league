@@ -122,7 +122,12 @@ function load(f) {
 function render() {
   let html = `<section><div class="shead"><h2>Players in this replay</h2><div class="rule"></div></div>`;
   players.forEach((p, i) => {
-    const suggestions = suggestPlayers(p.rawName, knownPlayers).filter(s => s.score > 0.35).slice(0, 5);
+    // When the parser couldn't confidently tell which connected machine
+    // controlled this team, rawName is just the team's own name (a fantasy
+    // clan name, not anyone's usual handle) — fuzzy-matching that against
+    // known players would produce noise, not a real suggestion, so skip
+    // auto-matching entirely and make the submitter pick or type a name.
+    const suggestions = p.identityUncertain ? [] : suggestPlayers(p.rawName, knownPlayers).filter(s => s.score > 0.35).slice(0, 5);
     const best = suggestions[0];
     // Default every player to something valid so submitting doesn't require
     // touching every dropdown: a confident match gets pre-selected, and if
@@ -148,6 +153,7 @@ function render() {
           value="${mapping[i].newName ? esc(mapping[i].newName) : esc(p.rawName)}">
       </div>
       <div class="hint">team "<span class="name-raw">${esc(p.teamName)}</span>" | ${p.colour} | ${p.turns} turns</div>
+      ${p.identityUncertain ? `<div class="hint err name-raw">Couldn't automatically tell who controlled this team (this can happen when a spectator was in the game) — please select or type the correct player above.</div>` : ''}
     </div>`;
   });
   html += `</section>

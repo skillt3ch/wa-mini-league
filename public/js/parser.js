@@ -130,6 +130,7 @@ export function parseWAGame(buf) {
         slot: d[t.start - 3],
         colourIdx: d[t.start - 2],
         machineIdx: null,
+        identityUncertain: false,
         start: t.start,
         blockEnd: t.blockEnd
       });
@@ -183,28 +184,51 @@ export function parseWAGame(buf) {
     machines[k].slotId = k;
   });
 
-  const owners = [];
-  machines.forEach((m, idx) => { if (m.hasTeam) owners.push(idx); });
+  // Team <-> machine attribution. A team's `slot` byte is, in practice, a
+  // direct index into `machines` for the machine that owns it, gated on
+  // that machine actually being hasTeam-flagged — this is right often
+  // enough (it's essentially always right for the host) to try first.
+  //
+  // What it isn't safe to do is guess when that direct link doesn't
+  // resolve. `slot` is a WA lobby box/colour-slot value, not a connection-
+  // order index, so nothing guarantees the two line up once a spectator or
+  // a drop/reconnect makes slot numbers non-contiguous — confirmed against
+  // a real replay where a real player's team had slot=3 while only 3
+  // machines (indices 0-2) were even connected, so the direct link had
+  // nothing valid to find. Worse, `hasTeam` itself turned out not to be a
+  // reliable "is this a real player" signal either: in that same replay the
+  // exact same byte signature fired for the host, the real opponent, AND a
+  // pure spectator, so pairing unclaimed teams against hasTeam-flagged
+  // machines in appearance order (the old fallback here) is exactly what
+  // mis-credited that spectator as an opponent — a wrong, silent, confident
+  // answer.
+  //
+  // So: only resolve the leftovers by elimination, and only when it's
+  // completely unambiguous (exactly one team still unresolved, exactly one
+  // machine still unclaimed). Any other shape of leftovers has no reliable
+  // local signal to pair correctly, so machineIdx is deliberately left
+  // unset and identityUncertain is raised instead of guessing.
+  // playersFromParsed() falls back to the team's own name in that case
+  // (always correct — spectators never get team records), and the
+  // submission UI already asks the submitter to confirm or correct every
+  // player, so an honest "don't know" surfaces as a blank dropdown to fill
+  // in rather than a wrong autofilled name.
+  const claimed = new Set();
   const bySlot = teams.map((t, idx) => idx).sort((a, b) => teams[a].slot - teams[b].slot);
-  bySlot.forEach((teamIdx, i) => {
+  bySlot.forEach(teamIdx => {
     const t = teams[teamIdx];
-    // A team's `slot` byte is, in practice, a direct index into `machines`
-    // for the machine that owns it — verified against real replays. Prefer
-    // that direct link (gated on the target machine actually being
-    // hasTeam-flagged, as a sanity check) over the hasTeam+appearance-order
-    // pairing below. The direct link survives a spectating/hosting machine
-    // being mis-flagged hasTeam=true (a false positive in the byte-signature
-    // scan above) — that machine's index just won't match any team's slot,
-    // so it's naturally excluded instead of displacing a real player out of
-    // position. Only fall back to order-pairing (which assumes slots are
-    // contiguous 0..n-1, so it's the one that can break after a drop/
-    // reconnect leaves gaps) when the direct link isn't usable.
     if (machines[t.slot] && machines[t.slot].hasTeam) {
       t.machineIdx = t.slot;
-    } else if (i < owners.length) {
-      t.machineIdx = owners[i];
+      claimed.add(t.slot);
     }
   });
+  const stillUnresolved = teams.filter(t => t.machineIdx === null);
+  const leftoverMachines = machines.map((m, idx) => idx).filter(idx => !claimed.has(idx));
+  if (stillUnresolved.length === 1 && leftoverMachines.length === 1) {
+    stillUnresolved[0].machineIdx = leftoverMachines[0];
+  } else {
+    stillUnresolved.forEach(t => { t.identityUncertain = true; });
+  }
 
   // Event stream — used only for per-team shot/turn counts and overall
   // duration/turn count here (chat + weapon breakdowns dropped).
@@ -273,13 +297,20 @@ export function parseWAGame(buf) {
   };
 }
 
-/** Convenience: flat list of {rawName, teamName, colour, shots, turns} for submission UI. */
+/** Convenience: flat list of {rawName, teamName, colour, shots, turns, identityUncertain} for submission UI. */
 export function playersFromParsed(r) {
   return r.teams.map((t, i) => ({
     rawName: t.machine ? t.machine.name : t.name,
     teamName: t.name,
     colour: t.colour.n,
     shots: r.per[i].shots,
-    turns: r.per[i].turns
+    turns: r.per[i].turns,
+    // true when the parser couldn't confidently tell which connected
+    // machine controlled this team (see the attribution comment above) —
+    // rawName falls back to the team's own name in that case, which is
+    // always accurate but isn't necessarily the player's usual handle, so
+    // the submission UI should prompt for manual confirmation instead of
+    // trusting a fuzzy-match auto-suggestion against it.
+    identityUncertain: !!t.identityUncertain
   }));
 }
