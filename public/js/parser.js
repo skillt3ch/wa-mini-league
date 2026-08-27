@@ -184,35 +184,46 @@ export function parseWAGame(buf) {
     machines[k].slotId = k;
   });
 
-  // Team <-> machine attribution. A team's `slot` byte is, in practice, a
-  // direct index into `machines` for the machine that owns it, gated on
-  // that machine actually being hasTeam-flagged — this is right often
-  // enough (it's essentially always right for the host) to try first.
+  // Team <-> machine attribution. Two documented approaches exist and both
+  // have real, demonstrated failure modes — see the two examples below,
+  // both taken from actual submitted replays:
   //
-  // What it isn't safe to do is guess when that direct link doesn't
-  // resolve. `slot` is a WA lobby box/colour-slot value, not a connection-
-  // order index, so nothing guarantees the two line up once a spectator or
-  // a drop/reconnect makes slot numbers non-contiguous — confirmed against
-  // a real replay where a real player's team had slot=3 while only 3
-  // machines (indices 0-2) were even connected, so the direct link had
-  // nothing valid to find. Worse, `hasTeam` itself turned out not to be a
-  // reliable "is this a real player" signal either: in that same replay the
-  // exact same byte signature fired for the host, the real opponent, AND a
-  // pure spectator, so pairing unclaimed teams against hasTeam-flagged
-  // machines in appearance order (the old fallback here) is exactly what
-  // mis-credited that spectator as an opponent — a wrong, silent, confident
-  // answer.
+  //  1) Direct link: treat a team's `slot` byte as an index straight into
+  //     `machines`. Right surprisingly often (any machine that never owns a
+  //     team — a host-only party, a spectator — just doesn't occupy a slot
+  //     a real team points at, so it's naturally skipped), but `slot` is a
+  //     WA lobby box/colour value, not a connection-order index, and
+  //     nothing guarantees the two line up once slot numbers go
+  //     non-contiguous: one real replay had a real player's team stored as
+  //     slot=3 while only 3 machines (indices 0-2) were even connected, so
+  //     there was no valid index to find at all.
+  //  2) Rank pairing (the original dreamwa.re approach this was ported
+  //     from): gather every machine flagged `hasTeam` (a byte-signature
+  //     scan — see below), sort teams by `slot` ascending, and pair the Nth
+  //     `hasTeam` machine with the Nth-lowest-slot team, on the theory that
+  //     a machine truly owning no team never gets that signature at all so
+  //     it's cleanly excluded. That theory broke on another real replay,
+  //     where a genuine spectator's machine got the *exact same*
+  //     byte signature as the host and the real opponent — its false
+  //     inclusion in the "owners" list shifted every team ranked after it
+  //     by one position, crediting the spectator as an opponent in the
+  //     real player's place.
   //
-  // So: only resolve the leftovers by elimination, and only when it's
-  // completely unambiguous (exactly one team still unresolved, exactly one
-  // machine still unclaimed). Any other shape of leftovers has no reliable
-  // local signal to pair correctly, so machineIdx is deliberately left
-  // unset and identityUncertain is raised instead of guessing.
-  // playersFromParsed() falls back to the team's own name in that case
-  // (always correct — spectators never get team records), and the
-  // submission UI already asks the submitter to confirm or correct every
-  // player, so an honest "don't know" surfaces as a blank dropdown to fill
-  // in rather than a wrong autofilled name.
+  // Neither approach is safe alone (each has a real replay proving it
+  // wrong), so: try the direct link first, since a clean hit is strong
+  // (the team's own stored slot value pointing at a real, hasTeam-flagged
+  // machine). For whatever's left over, only resolve by elimination when
+  // it's completely unambiguous — exactly one team still unresolved and
+  // exactly one hasTeam-flagged machine still unclaimed. Any other shape
+  // of leftovers (as in the spectator-signature-collision replay above,
+  // where 2 machines remained for 1 team) has no reliable local signal to
+  // pair correctly, so machineIdx is deliberately left unset and
+  // identityUncertain is raised instead of guessing. playersFromParsed()
+  // falls back to the team's own name in that case (always correct —
+  // spectators never get team records at all), and the submission UI asks
+  // the submitter to confirm or correct every player, so an honest "don't
+  // know" surfaces as a blank dropdown to fill in rather than a wrong
+  // autofilled name.
   const claimed = new Set();
   const bySlot = teams.map((t, idx) => idx).sort((a, b) => teams[a].slot - teams[b].slot);
   bySlot.forEach(teamIdx => {
@@ -223,7 +234,12 @@ export function parseWAGame(buf) {
     }
   });
   const stillUnresolved = teams.filter(t => t.machineIdx === null);
-  const leftoverMachines = machines.map((m, idx) => idx).filter(idx => !claimed.has(idx));
+  // Restricted to hasTeam-flagged machines, matching the rank-pairing
+  // theory above: a machine with no hasTeam signature at all is the one
+  // case both approaches agree is reliably "not a team owner", so it's
+  // excluded from the elimination candidate pool even though it's
+  // otherwise unclaimed.
+  const leftoverMachines = machines.map((m, idx) => idx).filter(idx => !claimed.has(idx) && machines[idx].hasTeam);
   if (stillUnresolved.length === 1 && leftoverMachines.length === 1) {
     stillUnresolved[0].machineIdx = leftoverMachines[0];
   } else {
