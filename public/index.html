@@ -123,27 +123,82 @@ function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 
 const COLOUR_HEX = { Red:'#DE4343', Blue:'#4A6FE0', Green:'#4FBF52', Yellow:'#E0BE2C', Magenta:'#C555C0', Cyan:'#4FC3C9' };
 
+let wadbPreviewFailed = false; // shown as a subtle note in render() when true
+
+// Merges WADB's engine-resolved player identity (from /api/analyze) onto
+// the locally-parsed player list, matched by team colour — same approach
+// as applyWadbIdentityCorrections() server-side in functions/_wadb.js.
+// Only overrides a row when WADB actually resolved a player for that
+// colour; anything WADB didn't cover keeps the local parser's own guess
+// (including its identityUncertain flag) untouched.
+function mergeWadbIdentity(localPlayers, wadbGame) {
+  const wadbTeams = (wadbGame && wadbGame.teams) || [];
+  return localPlayers.map(p => {
+    const wt = wadbTeams.find(t => (t.color || '').toUpperCase() === (p.colour || '').toUpperCase());
+    const wadbName = wt && wt.player && wt.player.name ? wt.player.name.trim() : '';
+    if (!wadbName) return p;
+    return { ...p, rawName: wadbName, identityUncertain: false };
+  });
+}
+
+let loadGeneration = 0; // guards against a slow WADB check from a previous file clobbering a newer one
+
 function load(f) {
   errEl.innerHTML = '';
   currentFile = f;
+  const myGen = ++loadGeneration;
   const fr = new FileReader();
   fr.onload = () => {
     try {
       parsed = parseWAGame(fr.result);
-      players = playersFromParsed(parsed);
-      mapping = players.map(() => ({ playerId: null, newName: null }));
-      render();
     } catch (ex) {
       out.hidden = true;
       errEl.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
+      return;
     }
+    checkWadbThenRender(playersFromParsed(parsed), f, myGen);
   };
   fr.onerror = () => { errEl.innerHTML = `<div class="err name-raw">Could not read that file.</div>`; };
   fr.readAsArrayBuffer(f);
 }
 
+// Checks with WADB immediately — before the submitter sees the player
+// list at all, not deferred to Confirm & submit — since its engine-
+// resolved identity is far more reliable than the local parser's guess.
+// Only falls back to that local guess if WADB can't be reached or
+// doesn't resolve a given team; the submitter still confirms/overrides
+// every row either way via the normal dropdown in render().
+async function checkWadbThenRender(localPlayers, file, myGen) {
+  wadbPreviewFailed = false;
+  out.hidden = false;
+  out.innerHTML = `<div class="hint name-raw">Checking with WADB...</div>`;
+
+  players = localPlayers;
+  try {
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    const res = await fetch('/api/analyze', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (myGen !== loadGeneration) return; // a newer file was dropped meanwhile -- discard this result
+    if (data.ok) {
+      players = mergeWadbIdentity(localPlayers, data.game);
+    } else {
+      wadbPreviewFailed = true;
+    }
+  } catch {
+    if (myGen !== loadGeneration) return;
+    wadbPreviewFailed = true;
+  }
+
+  mapping = players.map(() => ({ playerId: null, newName: null }));
+  render();
+}
+
 function render() {
   let html = `<section><div class="shead"><h2>Players in this replay</h2><div class="rule"></div></div>`;
+  if (wadbPreviewFailed) {
+    html += `<div class="hint name-raw">Couldn't reach WADB just now to confirm player identity ahead of time — showing the local best guess instead. This'll still be double-checked (and corrected if needed) when you submit.</div>`;
+  }
   players.forEach((p, i) => {
     // When the parser couldn't confidently tell which connected machine
     // controlled this team, rawName is just the team's own name (a fantasy
