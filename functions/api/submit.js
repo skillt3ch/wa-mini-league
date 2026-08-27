@@ -54,7 +54,23 @@ async function sha256Hex(buf) {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Top-level safety net: any unexpected exception anywhere below (a D1
+// error, a bad assumption about WADB's response shape, anything) still
+// needs to come back as JSON the client can parse and show as an error
+// message — not an uncaught-exception page, which the client can't parse
+// at all (shows up client-side as a raw "JSON.parse: unexpected character"
+// error instead of an actual message). The specific WADB/identity-
+// correction steps below have their own narrower try/catches for this same
+// reason; this is the catch-all for anything else.
 export async function onRequestPost(context) {
+  try {
+    return await handleSubmit(context);
+  } catch (err) {
+    return Response.json({ error: 'Unexpected server error: ' + (err?.message || err) }, { status: 500 });
+  }
+}
+
+async function handleSubmit(context) {
   const { env, request } = context;
 
   let form;
@@ -113,7 +129,21 @@ export async function onRequestPost(context) {
   let wadbResult = null, wadbCorrections = [];
   if (!manualWinner) {
     wadbResult = await callWadb(bytes, file.name);
-    if (wadbResult.ok) wadbCorrections = await applyWadbIdentityCorrections(env, players, wadbResult.game);
+    if (wadbResult.ok) {
+      // applyWadbIdentityCorrections does its own DB reads/writes
+      // (players/aliases lookups) — anything unexpected in there (a schema
+      // mismatch, a transient D1 error) shouldn't take the whole
+      // submission down with it. Degrade to "treat WADB as unavailable"
+      // instead: the existing needsManualWinner path already handles that
+      // gracefully, and it's far better than an uncaught exception turning
+      // into a raw error page the client can't even parse as JSON.
+      try {
+        wadbCorrections = await applyWadbIdentityCorrections(env, players, wadbResult.game);
+      } catch (err) {
+        wadbResult = { ok: false, reason: 'Identity cross-check failed: ' + (err?.message || err) };
+        wadbCorrections = [];
+      }
+    }
   }
 
   // Resolve each player entry to a player_id, creating new players/aliases
@@ -248,21 +278,29 @@ export async function onRequestPost(context) {
   // One row per WADB-corrected identity, purely as data to look back over
   // later (see migrations/0006_parser_discrepancies.sql) — plus a single
   // audit-log entry so it's visible in this game's own History panel too,
-  // same place every other change to this game shows up.
+  // same place every other change to this game shows up. The game itself
+  // is already fully saved by this point (correct identity and all), so
+  // this is wrapped defensively: a failure here (e.g. this migration not
+  // having been applied yet) should never turn an otherwise-successful
+  // submission into an uncaught exception / raw error page.
   if (wadbCorrections.length) {
-    for (const c of wadbCorrections) {
-      await env.DB.prepare(`
-        INSERT INTO parser_discrepancies
-          (game_id, colour, local_raw_name, local_identity_uncertain, wadb_player_name, wadb_is_spectator, wadb_is_host)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).bind(gameId, c.colour, c.oldName, c.wasUncertain ? 1 : 0, c.newName, c.wadbSpectator ? 1 : 0, c.wadbHost ? 1 : 0).run();
+    try {
+      for (const c of wadbCorrections) {
+        await env.DB.prepare(`
+          INSERT INTO parser_discrepancies
+            (game_id, colour, local_raw_name, local_identity_uncertain, wadb_player_name, wadb_is_spectator, wadb_is_host)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(gameId, c.colour, c.oldName, c.wasUncertain ? 1 : 0, c.newName, c.wadbSpectator ? 1 : 0, c.wadbHost ? 1 : 0).run();
+      }
+      await logGameAudit(env, {
+        gameId,
+        action: 'identity_corrected',
+        actor: 'system',
+        note: wadbCorrections.map(c => `${c.colour}: "${c.oldName}"${c.wasUncertain ? ' (parser unsure)' : ''} -> "${c.newName}" (WADB)`).join('; ')
+      });
+    } catch (err) {
+      console.error('Failed to log identity corrections for game', gameId, err);
     }
-    await logGameAudit(env, {
-      gameId,
-      action: 'identity_corrected',
-      actor: 'system',
-      note: wadbCorrections.map(c => `${c.colour}: "${c.oldName}"${c.wasUncertain ? ' (parser unsure)' : ''} -> "${c.newName}" (WADB)`).join('; ')
-    });
   }
 
   // Fire-and-forget: notify the games Discord channel without delaying the

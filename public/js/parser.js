@@ -184,66 +184,55 @@ export function parseWAGame(buf) {
     machines[k].slotId = k;
   });
 
-  // Team <-> machine attribution. Two documented approaches exist and both
-  // have real, demonstrated failure modes — see the two examples below,
-  // both taken from actual submitted replays:
+  // Team <-> machine attribution. Every approach tried so far — treating a
+  // team's `slot` byte as a direct index into `machines`, or the original
+  // dreamwa.re rank-pairing (sort teams by slot, sort `hasTeam`-flagged
+  // machines by appearance order, zip them) — has been proven wrong by a
+  // real submitted replay, and not just "fails to resolve": both can
+  // silently produce a confidently *wrong* answer, which is worse than not
+  // resolving at all. Three real examples:
   //
-  //  1) Direct link: treat a team's `slot` byte as an index straight into
-  //     `machines`. Right surprisingly often (any machine that never owns a
-  //     team — a host-only party, a spectator — just doesn't occupy a slot
-  //     a real team points at, so it's naturally skipped), but `slot` is a
-  //     WA lobby box/colour value, not a connection-order index, and
-  //     nothing guarantees the two line up once slot numbers go
-  //     non-contiguous: one real replay had a real player's team stored as
-  //     slot=3 while only 3 machines (indices 0-2) were even connected, so
-  //     there was no valid index to find at all.
-  //  2) Rank pairing (the original dreamwa.re approach this was ported
-  //     from): gather every machine flagged `hasTeam` (a byte-signature
-  //     scan — see below), sort teams by `slot` ascending, and pair the Nth
-  //     `hasTeam` machine with the Nth-lowest-slot team, on the theory that
-  //     a machine truly owning no team never gets that signature at all so
-  //     it's cleanly excluded. That theory broke on another real replay,
-  //     where a genuine spectator's machine got the *exact same*
-  //     byte signature as the host and the real opponent — its false
-  //     inclusion in the "owners" list shifted every team ranked after it
-  //     by one position, crediting the spectator as an opponent in the
-  //     real player's place.
+  //  - A real player's team was stored as slot=3 while only 3 machines
+  //    (indices 0-2) were connected at all — direct-indexing had nothing
+  //    valid to find, rank-pairing shifted a spectator into the second
+  //    real player's place instead.
+  //  - A genuine spectator's machine carried the exact same `hasTeam`
+  //    byte-signature as the host and the real opponent — the signature
+  //    fires on connected machines generally, not specifically on ones
+  //    that own a team, so it can't be trusted to exclude spectators at
+  //    all, in either approach above.
+  //  - Worse: a real player's team had slot=3, and a *different*,
+  //    non-owning machine (a spectator, also `hasTeam`-flagged) happened
+  //    to sit at array index 3 — direct-indexing "succeeded" (a valid,
+  //    hasTeam-flagged machine really was at that index) and confidently
+  //    credited the spectator instead of the real player, who was
+  //    connected at a different index entirely. A clean direct-link hit
+  //    is therefore not proof of correctness — it can be pure
+  //    coincidence.
   //
-  // Neither approach is safe alone (each has a real replay proving it
-  // wrong), so: try the direct link first, since a clean hit is strong
-  // (the team's own stored slot value pointing at a real, hasTeam-flagged
-  // machine). For whatever's left over, only resolve by elimination when
-  // it's completely unambiguous — exactly one team still unresolved and
-  // exactly one hasTeam-flagged machine still unclaimed. Any other shape
-  // of leftovers (as in the spectator-signature-collision replay above,
-  // where 2 machines remained for 1 team) has no reliable local signal to
-  // pair correctly, so machineIdx is deliberately left unset and
-  // identityUncertain is raised instead of guessing. playersFromParsed()
-  // falls back to the team's own name in that case (always correct —
-  // spectators never get team records at all), and the submission UI asks
-  // the submitter to confirm or correct every player, so an honest "don't
-  // know" surfaces as a blank dropdown to fill in rather than a wrong
-  // autofilled name.
-  const claimed = new Set();
-  const bySlot = teams.map((t, idx) => idx).sort((a, b) => teams[a].slot - teams[b].slot);
-  bySlot.forEach(teamIdx => {
-    const t = teams[teamIdx];
-    if (machines[t.slot] && machines[t.slot].hasTeam) {
-      t.machineIdx = t.slot;
-      claimed.add(t.slot);
-    }
-  });
-  const stillUnresolved = teams.filter(t => t.machineIdx === null);
-  // Restricted to hasTeam-flagged machines, matching the rank-pairing
-  // theory above: a machine with no hasTeam signature at all is the one
-  // case both approaches agree is reliably "not a team owner", so it's
-  // excluded from the elimination candidate pool even though it's
-  // otherwise unclaimed.
-  const leftoverMachines = machines.map((m, idx) => idx).filter(idx => !claimed.has(idx) && machines[idx].hasTeam);
-  if (stillUnresolved.length === 1 && leftoverMachines.length === 1) {
-    stillUnresolved[0].machineIdx = leftoverMachines[0];
+  // Given hasTeam doesn't reliably exclude non-owners and slot/array-index
+  // alignment is coincidental whenever a non-owning machine (a spectator,
+  // or a host who isn't also playing) is connected, there's no local
+  // signal left to trust *at all* once one exists. So: only resolve teams
+  // locally when there's no non-owner to possibly get confused with — i.e.
+  // every connected machine owns exactly one team (machines.length ===
+  // teams.length) — in which case pairing by rank (sorted by slot,
+  // zipped with appearance order) is safe simply because there's no one
+  // else it could be. The moment even one non-owning machine is present,
+  // every team is left unresolved (identityUncertain) rather than guessed.
+  // playersFromParsed() falls back to the team's own name in that case
+  // (always correct — spectators never get team records at all); the
+  // submission UI asks the submitter to confirm or correct every such
+  // player, and — more importantly — the backend cross-checks every
+  // submission against WADB's own engine-resolved player identity
+  // (see applyWadbIdentityCorrections in functions/_wadb.js) and corrects
+  // it there regardless of what happened locally. That server-side check
+  // is the real safety net now; this local heuristic is best-effort only.
+  if (machines.length === teams.length) {
+    const bySlot = teams.map((t, idx) => idx).sort((a, b) => teams[a].slot - teams[b].slot);
+    bySlot.forEach((teamIdx, i) => { teams[teamIdx].machineIdx = i; });
   } else {
-    stillUnresolved.forEach(t => { t.identityUncertain = true; });
+    teams.forEach(t => { t.identityUncertain = true; });
   }
 
   // Event stream — used only for per-team shot/turn counts and overall
