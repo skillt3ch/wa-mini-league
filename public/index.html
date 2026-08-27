@@ -87,6 +87,29 @@ let currentFile = null;
 
 fetch('/api/players').then(r => r.json()).then(list => { knownPlayers = list; }).catch(() => {});
 
+// Same session-password check as standings.html/adminNav.js — only used
+// here to decide whether a duplicate-replay rejection gets a "delete the
+// old one and resubmit" option, or just the plain error everyone else
+// sees. Nothing here trusts the client: the actual delete still requires
+// a valid X-Admin-Password header, checked server-side same as elsewhere.
+function getAdminPw() { return sessionStorage.getItem('wa_admin_pw') || ''; }
+let isAdminUser = false;
+async function checkAdmin() {
+  const pw = getAdminPw();
+  if (!pw) return false;
+  try {
+    const res = await fetch('/api/admin/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+checkAdmin().then(v => { isAdminUser = v; });
+
 drop.addEventListener('click', () => fileInput.click());
 drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
 fileInput.addEventListener('change', e => { if (e.target.files[0]) load(e.target.files[0]); });
@@ -236,6 +259,55 @@ function renderManualPicker(note) {
   });
 }
 
+// Shown when this exact replay (matched by SHA-256, server-side) was
+// already submitted before, AND the current user is a logged-in admin.
+// Everyone else just gets the plain "already submitted" error from
+// submit()'s catch block below — this is strictly an admin convenience,
+// not a way around the duplicate check itself. Deleting reuses the same
+// admin DELETE endpoint standings.html's game log already offers (it
+// frees the R2 replay key too), then resubmits the same file/mapping so
+// the now-unused hash succeeds.
+function renderDuplicatePrompt(existingGameId, note, manualWinner) {
+  const msg = document.getElementById('submitMsg');
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.hidden = true;
+
+  msg.innerHTML = `
+    <div class="card">
+      <div class="err name-raw">${esc(note || 'This replay has already been submitted.')}</div>
+      <div class="hint" style="margin-top:6px;">Logged in as admin — you can delete the existing game (#${existingGameId}) and replace it with this upload.</div>
+      <button class="opt" id="deleteReplaceBtn" style="margin-top:10px;">Delete existing game &amp; resubmit</button>
+      <div id="deleteReplaceMsg"></div>
+    </div>`;
+
+  document.getElementById('deleteReplaceBtn').addEventListener('click', async () => {
+    if (!confirm(`Delete game #${existingGameId} and replace it with this upload? This cannot be undone.`)) return;
+    const btn = document.getElementById('deleteReplaceBtn');
+    const dmsg = document.getElementById('deleteReplaceMsg');
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+    try {
+      const res = await fetch(`/api/admin/games/${existingGameId}`, {
+        method: 'DELETE',
+        headers: { 'X-Admin-Password': getAdminPw() }
+      });
+      const text = await res.text();
+      let data = null;
+      if (text) {
+        try { data = JSON.parse(text); }
+        catch { throw new Error(`Server returned a non-JSON response (HTTP ${res.status}).`); }
+      }
+      if (!res.ok) throw new Error(data?.error || `Delete failed (HTTP ${res.status}).`);
+      dmsg.innerHTML = `<div class="hint">Old game deleted - resubmitting...</div>`;
+      await submit(manualWinner);
+    } catch (ex) {
+      dmsg.innerHTML = `<div class="err name-raw">${esc(ex.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = 'Delete existing game & resubmit';
+    }
+  });
+}
+
 async function submit(manualWinner) {
   const msg = document.getElementById('submitMsg');
   msg.innerHTML = '';
@@ -257,7 +329,13 @@ async function submit(manualWinner) {
   try {
     const res = await fetch('/api/submit', { method: 'POST', body: buildSubmitFormData(manualWinner) });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Submission failed.');
+    if (!res.ok) {
+      if (res.status === 409 && data.gameId && isAdminUser) {
+        renderDuplicatePrompt(data.gameId, data.error, manualWinner);
+        return;
+      }
+      throw new Error(data.error || 'Submission failed.');
+    }
 
     if (data.needsManualWinner) {
       renderManualPicker(data.wadbNote);
