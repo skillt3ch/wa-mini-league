@@ -16,6 +16,16 @@ export function leagueHasEnded() {
 // ever wants to clear it, e.g. on navigation away in an SPA-like context.
 export function renderCountdown(el, { onEnd } = {}) {
   let firedEnd = false;
+  // Declared (not just assigned) before tick() ever runs: tick() references
+  // `id` in its already-ended branch, and it's called once synchronously
+  // below before the interval is created. If the deadline has already
+  // passed at render time (true from the moment the league ends onward),
+  // that first synchronous call hit `id` while it was still a TDZ `const`,
+  // throwing "Cannot access 'id' before initialization" and killing this
+  // entire module script — including everything after this call on the
+  // page (standings/games fetches, admin login wiring). `let id` declared
+  // up front avoids the TDZ regardless of call order.
+  let id;
   function tick() {
     const diff = new Date(LEAGUE_ENDS_AT).getTime() - Date.now();
     if (diff <= 0) {
@@ -36,6 +46,6 @@ export function renderCountdown(el, { onEnd } = {}) {
     el.textContent = `League closes in ${pad(h)}:${pad(m)}:${pad(s)}`;
   }
   tick();
-  const id = setInterval(tick, 1000);
+  id = setInterval(tick, 1000);
   return id;
 }
