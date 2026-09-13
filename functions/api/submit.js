@@ -48,6 +48,7 @@ import { notifyDiscord, buildGameEmbed } from '../_discord.js';
 import { callWadb, resolveOutcome, applyWadbIdentityCorrections } from '../_wadb.js';
 import { logGameAudit } from '../_gameAudit.js';
 import { getClientIp } from '../_util.js';
+import { leagueHasEnded, LEAGUE_ENDS_AT } from '../_league.js';
 
 async function sha256Hex(buf) {
   const digest = await crypto.subtle.digest('SHA-256', buf);
@@ -72,6 +73,16 @@ export async function onRequestPost(context) {
 
 async function handleSubmit(context) {
   const { env, request } = context;
+
+  // Authoritative deadline check — independent of whatever the submit page's
+  // own countdown/lock UI shows, since a cached page or a clock a few
+  // minutes off shouldn't let a late submission through. See ../_league.js.
+  if (leagueHasEnded()) {
+    return Response.json(
+      { error: `Submissions are closed — the league ended at ${LEAGUE_ENDS_AT}.` },
+      { status: 403 }
+    );
+  }
 
   let form;
   try {

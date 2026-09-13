@@ -37,6 +37,8 @@
     <a href="/admin.html" id="adminNavLink" hidden>Admin</a>
   </nav>
 
+  <div class="league-countdown" id="leagueCountdown"></div>
+
   <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a replay file">
     <div class="big">Click to choose a file, or <b>drag &amp; drop</b> it here</div>
     <div class="sub">.WAgame files only - nothing leaves this machine until you submit</div>
@@ -73,11 +75,13 @@
 <script type="module">
 import { parseWAGame, playersFromParsed } from '/js/parser.js';
 import { suggestPlayers } from '/js/similarity.js';
+import { renderCountdown } from '/js/leagueEnd.js';
 
 const drop = document.getElementById('drop'),
       fileInput = document.getElementById('file'),
       errEl = document.getElementById('err'),
-      out = document.getElementById('out');
+      out = document.getElementById('out'),
+      countdownEl = document.getElementById('leagueCountdown');
 
 let knownPlayers = [];
 let parsed = null;
@@ -86,6 +90,18 @@ let mapping = [];      // per-player { playerId|null, newName|null }
 let currentFile = null;
 
 fetch('/api/players').then(r => r.json()).then(list => { knownPlayers = list; }).catch(() => {});
+
+// UI-side lock only — the real enforcement is server-side in
+// functions/api/submit.js (see ../_league.js), which rejects a late
+// submission regardless of what this page shows. This just avoids letting
+// someone go through the whole flow only to have it rejected at the end.
+function lockSubmission() {
+  drop.hidden = true;
+  fileInput.disabled = true;
+  out.hidden = true;
+  errEl.innerHTML = '<div class="err name-raw">Submissions are closed — the league has ended. Check the final standings.</div>';
+}
+renderCountdown(countdownEl, { onEnd: lockSubmission });
 
 // Same session-password check as standings.html/adminNav.js — only used
 // here to decide whether a duplicate-replay rejection gets a "delete the

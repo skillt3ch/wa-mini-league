@@ -37,6 +37,8 @@
     <a href="/admin.html" id="adminNavLink" hidden>Admin</a>
   </nav>
 
+  <div class="league-countdown" id="leagueCountdown"></div>
+
   <div class="filter-row">
     <input type="text" id="search" class="search-input" placeholder="Search player name...">
     <div class="filter-btns">
@@ -69,6 +71,9 @@
 </div>
 
 <script type="module">
+import { renderCountdown } from '/js/leagueEnd.js';
+renderCountdown(document.getElementById('leagueCountdown'));
+
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 // Same session-password check as public/js/adminNav.js (which only

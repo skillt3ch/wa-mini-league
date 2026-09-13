@@ -37,6 +37,8 @@
     <a href="/admin.html" id="adminNavLink" class="active" hidden>Admin</a>
   </nav>
 
+  <div class="league-countdown" id="leagueCountdown"></div>
+
   <div id="loginBox" class="admin-login">
     <p class="hint">Enter the admin password to continue.</p>
     <input type="password" id="pw" placeholder="Admin password">
@@ -107,6 +109,9 @@
 </div>
 
 <script type="module">
+import { renderCountdown } from '/js/leagueEnd.js';
+renderCountdown(document.getElementById('leagueCountdown'));
+
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 // Renders an IP address as a clickable lookup link (opens in a new tab) —
